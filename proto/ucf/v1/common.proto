@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package ucf.v1;
+
+enum DataClass {
+  DATA_CLASS_UNSPECIFIED = 0;
+  DATA_CLASS_PUBLIC = 1;
+  DATA_CLASS_CONFIDENTIAL = 2;
+  DATA_CLASS_RESTRICTED = 3;
+}
+
+enum DecisionForm {
+  DECISION_FORM_UNSPECIFIED = 0;
+  DECISION_FORM_ALLOW = 1;
+  DECISION_FORM_DENY = 2;
+  DECISION_FORM_REQUIRE_APPROVAL = 3;
+}
+
+enum RecordType {
+  RECORD_TYPE_UNSPECIFIED = 0;
+  RECORD_TYPE_POLICY = 1;
+  RECORD_TYPE_PROOF = 2;
+  RECORD_TYPE_AUDIT = 3;
+}
+
+message Digest32 {
+  bytes value = 1;
+}
+
+message Signature {
+  string algorithm = 1;
+  bytes signer = 2;
+  bytes signature = 3;
+}
+
+message Ref {
+  string uri = 1;
+  string label = 2;
+}
+
+message ReasonCodes {
+  repeated string codes = 1;
+}

@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package ucf.v1;
+
+import "ucf/v1/common.proto";
+
+enum MsgType {
+  MSG_TYPE_UNSPECIFIED = 0;
+  MSG_TYPE_CANONICAL_INTENT = 1;
+  MSG_TYPE_POLICY_QUERY = 2;
+  MSG_TYPE_POLICY_DECISION = 3;
+  MSG_TYPE_PVGS_RECEIPT = 4;
+}
+
+message UcfEnvelope {
+  string epoch_id = 1;
+  bytes nonce = 2;
+  Signature signature = 3;
+  Digest32 payload_digest = 4;
+  MsgType msg_type = 5;
+  bytes payload = 6;
+}

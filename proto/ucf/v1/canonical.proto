@@ -1,0 +1,62 @@
+syntax = "proto3";
+
+package ucf.v1;
+
+import "ucf/v1/common.proto";
+
+enum Channel {
+  CHANNEL_UNSPECIFIED = 0;
+  CHANNEL_BATCH = 1;
+  CHANNEL_REALTIME = 2;
+}
+
+enum RiskLevel {
+  RISK_LEVEL_UNSPECIFIED = 0;
+  RISK_LEVEL_LOW = 1;
+  RISK_LEVEL_MEDIUM = 2;
+  RISK_LEVEL_HIGH = 3;
+}
+
+message ActionSpec {
+  string verb = 1;
+  repeated string resources = 2;
+}
+
+message ActionProgram {
+  repeated ActionSpec steps = 1;
+  string semantics = 2;
+}
+
+message QueryParams {
+  string query = 1;
+  repeated string selectors = 2;
+}
+
+message ExecuteParams {
+  ActionProgram program = 1;
+}
+
+message PersistParams {
+  RecordType record_type = 1;
+  bytes record = 2;
+}
+
+message ApprovalRequestParams {
+  DecisionForm requested_decision = 1;
+  ReasonCodes reason_codes = 2;
+}
+
+message CanonicalIntent {
+  string intent_id = 1;
+  Channel channel = 2;
+  RiskLevel risk_level = 3;
+  DataClass data_class = 4;
+  Ref subject = 5;
+  ReasonCodes reason_codes = 6;
+  oneof params {
+    QueryParams query = 7;
+    ExecuteParams execute = 8;
+    PersistParams persist = 9;
+    ApprovalRequestParams approval_request = 10;
+  }
+}

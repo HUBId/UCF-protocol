@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+package ucf.v1;
+
+import "ucf/v1/common.proto";
+
+enum ReceiptStatus {
+  RECEIPT_STATUS_UNSPECIFIED = 0;
+  RECEIPT_STATUS_ACCEPTED = 1;
+  RECEIPT_STATUS_REJECTED = 2;
+  RECEIPT_STATUS_PENDING = 3;
+}
+
+message PVGSReceipt {
+  ReceiptStatus status = 1;
+  Digest32 program_digest = 2;
+  Digest32 proof_digest = 3;
+  Signature signer = 4;
+}
+
+message ProofReceipt {
+  ReceiptStatus status = 1;
+  Digest32 receipt_digest = 2;
+  Signature validator = 3;
+}
+
+message CharacterBaselineVector {
+  repeated double weights = 1;
+  repeated double values = 2;
+}
