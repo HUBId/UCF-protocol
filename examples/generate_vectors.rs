@@ -5,7 +5,7 @@ use ucf_protocol::ucf::v1::canonical_intent::Params as CanonicalIntentParams;
 use ucf_protocol::ucf::v1::*;
 use ucf_protocol::{canonical_bytes, digest32};
 
-fn ensure_sorted(values: &mut Vec<String>) {
+fn ensure_sorted(values: &mut [String]) {
     values.sort();
 }
 
