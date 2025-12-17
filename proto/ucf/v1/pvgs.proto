@@ -22,6 +22,7 @@ message ProofReceipt {
   ReceiptStatus status = 1;
   Digest32 receipt_digest = 2;
   Signature validator = 3;
+  Digest32 vrf_digest = 4;
 }
 
 message CharacterBaselineVector {

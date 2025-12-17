@@ -1,0 +1,11 @@
+[package]
+name = "ucf-pvgs"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "PVGS receipt issuance helpers for Chip 4"
+
+[dependencies]
+blake3 = "1"
+ucf-protocol = { path = "../.." }
+ucf-vrf = { path = "../vrf" }
