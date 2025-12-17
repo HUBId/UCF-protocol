@@ -1,0 +1,19 @@
+[package]
+name = "ucf-protocol"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+repository = "https://example.com/ucf-protocol"
+description = "UCF protocol core protobufs and determinism fixtures"
+build = "build.rs"
+
+[dependencies]
+prost = "0.12"
+blake3 = "1"
+hex = "0.4"
+
+[build-dependencies]
+prost-build = "0.12"
+
+[dev-dependencies]
+anyhow = "1"

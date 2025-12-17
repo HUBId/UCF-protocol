@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package ucf.v1;
+
+import "ucf/v1/common.proto";
+import "ucf/v1/canonical.proto";
+
+message PolicyQuery {
+  string principal = 1;
+  ActionSpec action = 2;
+  Channel channel = 3;
+  RiskLevel risk_level = 4;
+  DataClass data_class = 5;
+  ReasonCodes reason_codes = 6;
+}
+
+message ConstraintsDelta {
+  repeated string constraints_added = 1;
+  repeated string constraints_removed = 2;
+}
+
+message PolicyDecision {
+  DecisionForm decision = 1;
+  ReasonCodes reason_codes = 2;
+  ConstraintsDelta constraints = 3;
+}
