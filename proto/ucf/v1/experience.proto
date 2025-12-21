@@ -1,0 +1,56 @@
+syntax = "proto3";
+
+package ucf.v1;
+
+import "ucf/v1/common.proto";
+
+// Enumerates runtime record types emitted by the UCF runtime.
+enum RuntimeRecordType {
+  RUNTIME_RECORD_TYPE_UNSPECIFIED = 0;
+  RUNTIME_RECORD_TYPE_RT_PERCEPTION = 1;
+  RUNTIME_RECORD_TYPE_RT_ACTION_EXEC = 2;
+  RUNTIME_RECORD_TYPE_RT_OUTPUT = 3;
+}
+
+// Core signals for an experience record that describe the activity context.
+message CoreFrame {
+  string intent_id = 1;
+  string session_id = 2;
+  string step_id = 3;
+  string actor = 4;
+  string description = 5;
+}
+
+// Metabolic signals emitted by the runtime.
+message MetabolicFrame {
+  uint64 prompt_tokens = 1;
+  uint64 completion_tokens = 2;
+  uint64 latency_ms = 3;
+  bool cache_hit = 4;
+}
+
+// Governance decision signals bundled with the record.
+message GovernanceFrame {
+  DecisionForm decision = 1;
+  ReasonCodes reason_codes = 2;
+  repeated string constraints_applied = 3;
+}
+
+// Finalization metadata for chaining experience records.
+message FinalizationHeader {
+  uint64 epoch_id = 1;
+  string charter_digest = 2;
+  Digest32 profile_digest = 3;
+  Digest32 prev_record_digest = 4;
+  Digest32 record_digest = 5;
+  Signature vrf_proof = 6;
+}
+
+// Aggregated experience record emitted by the runtime.
+message ExperienceRecord {
+  RuntimeRecordType record_type = 1;
+  CoreFrame core = 2;
+  MetabolicFrame metabolic = 3;
+  GovernanceFrame governance = 4;
+  FinalizationHeader finalization = 5;
+}
