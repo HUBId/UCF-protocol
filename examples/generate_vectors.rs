@@ -78,10 +78,12 @@ fn main() -> anyhow::Result<()> {
 
     let mut action_constraints = vec!["rate-limit".to_string(), "humans-in-loop".to_string()];
     ensure_sorted(&mut action_constraints);
-    let mut action_reason_codes = vec!["approval-required".to_string(), "safety-review".to_string()];
+    let mut action_reason_codes =
+        vec!["approval-required".to_string(), "safety-review".to_string()];
     ensure_sorted(&mut action_reason_codes);
 
-    let mut output_constraints = vec!["output-audited".to_string(), "watermark-applied".to_string()];
+    let mut output_constraints =
+        vec!["output-audited".to_string(), "watermark-applied".to_string()];
     ensure_sorted(&mut output_constraints);
     let mut output_reason_codes = vec!["output-ready".to_string()];
     ensure_sorted(&mut output_reason_codes);
