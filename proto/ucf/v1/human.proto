@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+package ucf.v1;
+
+import "ucf/v1/common.proto";
+
+// Action Assurance Plan capturing human approvals and contingencies.
+message AAP {
+  string plan_id = 1;
+  string session_id = 2;
+  repeated string objectives = 3;
+  repeated ApprovalDecision approvals = 4;
+  repeated RecoveryCase recoveries = 5;
+  StopEvent stop_event = 6;
+}
+
+// Individual approval decision.
+message ApprovalDecision {
+  string approver = 1;
+  DecisionForm decision = 2;
+  ReasonCodes reason_codes = 3;
+  string summary = 4;
+}
+
+// Recovery path to follow for a given trigger.
+message RecoveryCase {
+  string trigger = 1;
+  repeated string steps = 2;
+  string owner = 3;
+}
+
+// Terminal stop signal issued by a human or system.
+message StopEvent {
+  string reason = 1;
+  string actor = 2;
+  uint64 timestamp = 3;
+  string summary = 4;
+}

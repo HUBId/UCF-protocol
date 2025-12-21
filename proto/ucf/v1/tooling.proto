@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+package ucf.v1;
+
+import "ucf/v1/frames.proto";
+
+// Profile describing an action exposed by a tool or adapter.
+message ToolActionProfile {
+  string action_id = 1;
+  string display_name = 2;
+  ToolClass tool_class = 3;
+  repeated string input_types = 4;
+  string output_type = 5;
+  bool requires_approval = 6;
+}
+
+// Mapping between adapters and the tool identifiers they surface.
+message AdapterMapEntry {
+  string adapter = 1;
+  string tool_id = 2;
+  string version = 3;
+}
+
+// Container for publishing the current registry state for tools and adapters.
+message ToolRegistryContainer {
+  repeated ToolActionProfile actions = 1;
+  repeated AdapterMapEntry adapters = 2;
+  string steward = 3;
+  uint64 updated_at = 4;
+}
+
+// Event emitted when a tool is onboarded into the registry.
+message ToolOnboardingEvent {
+  string tool_id = 1;
+  string submitted_by = 2;
+  ToolActionProfile profile = 3;
+  string review_status = 4;
+}
