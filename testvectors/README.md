@@ -14,6 +14,8 @@ The fixtures currently included are:
 | canonical_intent_query | `ucf-core`   | `ucf.v1.CanonicalIntent` | `1`     |
 | policy_decision        | `ucf-core`   | `ucf.v1.PolicyDecision`  | `1`     |
 | pvgs_receipt           | `ucf-core`   | `ucf.v1.PVGSReceipt`     | `1`     |
+| signal_frame_short_window | `ucf-core` | `ucf.v1.SignalFrame`     | `1`     |
+| control_frame_m1_overlays_on | `ucf-core` | `ucf.v1.ControlFrame` | `1`     |
 
 All repeated fields that represent sets are pre-sorted in the encoded bytes so
 that recomputation via the library helpers yields identical outputs.
