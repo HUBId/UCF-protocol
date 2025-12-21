@@ -13,7 +13,8 @@ messages.
 * Canonical bytes are the deterministic protobuf encoding of the fully prepared
   message. The `canonical_bytes` helper in this crate performs the encoding; the
   caller is responsible for ordering any set-like repeated fields before
-  encoding.
+  encoding. Tests exercise `prost`'s deterministic encoder path by re-encoding
+  fixtures and asserting byte-for-byte stability.
 
 ## Digest construction
 
