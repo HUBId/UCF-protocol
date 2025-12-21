@@ -333,10 +333,7 @@ fn main() -> anyhow::Result<()> {
     let onboarding_digest = digest32(domain, "ucf.v1.ToolOnboardingEvent", "1", &onboarding_bytes);
     write_fixture("tool_onboarding_event", &onboarding_bytes, onboarding_digest)?;
 
-    let mut objectives = vec![
-        "capture approvals".to_string(),
-        "ensure auditability".to_string(),
-    ];
+    let mut objectives = vec!["capture approvals".to_string(), "ensure auditability".to_string()];
     ensure_sorted(&mut objectives);
 
     let mut approval_reasons = vec!["policy-aligned".to_string(), "risk-low".to_string()];
