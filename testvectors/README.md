@@ -23,6 +23,12 @@ The fixtures currently included are:
 | replay_plan_triggered | `ucf-core` | `ucf.v1.ReplayPlan` | `1`     |
 | consistency_feedback_low | `ucf-core` | `ucf.v1.ConsistencyFeedback` | `1`     |
 | consistency_feedback_high | `ucf-core` | `ucf.v1.ConsistencyFeedback` | `1`     |
+| tool_registry_container | `ucf-core` | `ucf.v1.ToolRegistryContainer` | `1`     |
+| tool_onboarding_event | `ucf-core` | `ucf.v1.ToolOnboardingEvent` | `1`     |
+| aap_with_recovery | `ucf-core` | `ucf.v1.AAP` | `1`     |
+| sep_event_chain | `ucf-core` | `ucf.v1.SepEvent` | `1`     |
+| session_seal | `ucf-core` | `ucf.v1.SessionSeal` | `1`     |
+| completeness_report | `ucf-core` | `ucf.v1.CompletenessReport` | `1`     |
 
 All repeated fields that represent sets are pre-sorted in the encoded bytes so
 that recomputation via the library helpers yields identical outputs.

@@ -12,7 +12,7 @@ message SepEvent {
   repeated string parents = 4;
   string payload = 5;
   uint64 timestamp = 6;
-  string summary = 7;
+  optional string summary = 7;
 }
 
 // Immutable seal applied when a session finishes.
@@ -21,7 +21,7 @@ message SessionSeal {
   Digest32 record_digest = 2;
   Signature signer = 3;
   uint64 sealed_at = 4;
-  string summary = 5;
+  optional string summary = 5;
 }
 
 // Report describing expected versus observed activity.
@@ -30,5 +30,5 @@ message CompletenessReport {
   uint64 observed_events = 2;
   uint64 expected_events = 3;
   bool terminal = 4;
-  string summary = 5;
+  optional string summary = 5;
 }

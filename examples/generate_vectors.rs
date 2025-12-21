@@ -382,7 +382,7 @@ fn main() -> anyhow::Result<()> {
         parents: parent_events,
         payload: "kickoff".to_string(),
         timestamp: 1_700_002_000,
-        summary: "Initial planning event".to_string(),
+        summary: Some("Initial planning event".to_string()),
     };
 
     let sep_bytes = canonical_bytes(&sep_event);
@@ -398,7 +398,7 @@ fn main() -> anyhow::Result<()> {
             signature: vec![0x01, 0x02, 0x03, 0x04],
         }),
         sealed_at: 1_700_002_500,
-        summary: "Session closed".to_string(),
+        summary: Some("Session closed".to_string()),
     };
 
     let seal_bytes = canonical_bytes(&session_seal);
@@ -410,7 +410,7 @@ fn main() -> anyhow::Result<()> {
         observed_events: 3,
         expected_events: 3,
         terminal: true,
-        summary: "All planned events observed".to_string(),
+        summary: Some("All planned events observed".to_string()),
     };
 
     let completeness_bytes = canonical_bytes(&completeness_report);
