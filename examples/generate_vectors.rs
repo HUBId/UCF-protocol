@@ -32,13 +32,8 @@ fn main() -> anyhow::Result<()> {
         channel: Channel::Realtime as i32,
         risk_level: RiskLevel::Low as i32,
         data_class: DataClass::Public as i32,
-        subject: Some(Ref {
-            uri: "did:example:subject".to_string(),
-            label: "primary".to_string(),
-        }),
-        reason_codes: Some(ReasonCodes {
-            codes: ci_reason_codes,
-        }),
+        subject: Some(Ref { uri: "did:example:subject".to_string(), label: "primary".to_string() }),
+        reason_codes: Some(ReasonCodes { codes: ci_reason_codes }),
         params: Some(CanonicalIntentParams::Query(QueryParams {
             query: "select * from controls".to_string(),
             selectors: query_selectors,
@@ -58,13 +53,8 @@ fn main() -> anyhow::Result<()> {
 
     let policy_decision = PolicyDecision {
         decision: DecisionForm::RequireApproval as i32,
-        reason_codes: Some(ReasonCodes {
-            codes: pd_reason_codes,
-        }),
-        constraints: Some(ConstraintsDelta {
-            constraints_added,
-            constraints_removed,
-        }),
+        reason_codes: Some(ReasonCodes { codes: pd_reason_codes }),
+        constraints: Some(ConstraintsDelta { constraints_added, constraints_removed }),
     };
 
     let pd_bytes = canonical_bytes(&policy_decision);
@@ -73,12 +63,8 @@ fn main() -> anyhow::Result<()> {
 
     let pvgs_receipt = PvgsReceipt {
         status: ReceiptStatus::Accepted as i32,
-        program_digest: Some(Digest32 {
-            value: (0u8..32).collect(),
-        }),
-        proof_digest: Some(Digest32 {
-            value: vec![0xAA; 32],
-        }),
+        program_digest: Some(Digest32 { value: (0u8..32).collect() }),
+        proof_digest: Some(Digest32 { value: vec![0xAA; 32] }),
         signer: Some(Signature {
             algorithm: "ed25519".to_string(),
             signer: vec![0x01, 0x02, 0x03, 0x04],

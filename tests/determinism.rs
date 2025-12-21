@@ -1,3 +1,5 @@
+#![forbid(unsafe_code)]
+
 use std::fs;
 
 use anyhow::{Context, Result};
@@ -19,9 +21,8 @@ fn load_fixture(name: &str) -> Result<(Vec<u8>, [u8; 32])> {
     let digest_hex = fs::read_to_string(format!("testvectors/{name}.digest"))
         .with_context(|| format!("reading {name}.digest"))?;
     let digest_vec = hex::decode(digest_hex.trim()).context("decoding digest hex")?;
-    let digest: [u8; 32] = digest_vec
-        .try_into()
-        .map_err(|_| anyhow::anyhow!("digest must be 32 bytes"))?;
+    let digest: [u8; 32] =
+        digest_vec.try_into().map_err(|_| anyhow::anyhow!("digest must be 32 bytes"))?;
     Ok((bytes, digest))
 }
 
@@ -52,10 +53,7 @@ fn canonical_intent_fixture_roundtrip() -> Result<()> {
         channel: Channel::Realtime as i32,
         risk_level: RiskLevel::Low as i32,
         data_class: DataClass::Public as i32,
-        subject: Some(Ref {
-            uri: "did:example:subject".to_string(),
-            label: "primary".to_string(),
-        }),
+        subject: Some(Ref { uri: "did:example:subject".to_string(), label: "primary".to_string() }),
         reason_codes: Some(ReasonCodes {
             codes: vec!["baseline".to_string(), "query".to_string()],
         }),
@@ -88,12 +86,8 @@ fn policy_decision_fixture_roundtrip() -> Result<()> {
 fn pvgs_receipt_fixture_roundtrip() -> Result<()> {
     let expected = PvgsReceipt {
         status: ReceiptStatus::Accepted as i32,
-        program_digest: Some(Digest32 {
-            value: (0u8..32).collect(),
-        }),
-        proof_digest: Some(Digest32 {
-            value: vec![0xAA; 32],
-        }),
+        program_digest: Some(Digest32 { value: (0u8..32).collect() }),
+        proof_digest: Some(Digest32 { value: vec![0xAA; 32] }),
         signer: Some(Signature {
             algorithm: "ed25519".to_string(),
             signer: vec![0x01, 0x02, 0x03, 0x04],

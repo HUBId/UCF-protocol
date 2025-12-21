@@ -1,3 +1,5 @@
+#![forbid(unsafe_code)]
+
 //! UCF protocol core types and deterministic helpers.
 use blake3::Hasher;
 use prost::Message;
