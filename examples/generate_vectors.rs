@@ -59,9 +59,7 @@ fn main() -> anyhow::Result<()> {
     let replay_plan = ReplayPlan {
         plan_id: "replay-epoch-17".to_string(),
         trigger: "finalization-drift".to_string(),
-        reason_codes: Some(ReasonCodes {
-            codes: replay_reason_codes,
-        }),
+        reason_codes: Some(ReasonCodes { codes: replay_reason_codes }),
         actions: macro_actions,
     };
 
