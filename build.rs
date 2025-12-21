@@ -10,6 +10,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "proto/ucf/v1/pvgs.proto",
         "proto/ucf/v1/frames.proto",
         "proto/ucf/v1/experience.proto",
+        "proto/ucf/v1/milestones.proto",
+        "proto/ucf/v1/geist.proto",
     ];
 
     println!("cargo:rerun-if-changed=proto");
