@@ -489,7 +489,7 @@ fn sep_event_chain_roundtrip() -> Result<()> {
         parents: parent_events,
         payload: "kickoff".to_string(),
         timestamp: 1_700_002_000,
-        summary: "Initial planning event".to_string(),
+        summary: Some("Initial planning event".to_string()),
     };
 
     verify_roundtrip("sep_event_chain", SEP_EVENT_SCHEMA, expected)
@@ -506,7 +506,7 @@ fn session_seal_roundtrip() -> Result<()> {
             signature: vec![0x01, 0x02, 0x03, 0x04],
         }),
         sealed_at: 1_700_002_500,
-        summary: "Session closed".to_string(),
+        summary: Some("Session closed".to_string()),
     };
 
     verify_roundtrip("session_seal", SESSION_SEAL_SCHEMA, expected)
@@ -519,7 +519,7 @@ fn completeness_report_roundtrip() -> Result<()> {
         observed_events: 3,
         expected_events: 3,
         terminal: true,
-        summary: "All planned events observed".to_string(),
+        summary: Some("All planned events observed".to_string()),
     };
 
     verify_roundtrip("completeness_report", COMPLETENESS_REPORT_SCHEMA, expected)
