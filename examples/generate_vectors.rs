@@ -12,8 +12,12 @@ fn ensure_sorted(values: &mut [String]) {
 fn write_fixture(name: &str, bytes: &[u8], digest: [u8; 32]) -> anyhow::Result<()> {
     let hex_path = Path::new("testvectors").join(format!("{name}.hex"));
     let digest_path = Path::new("testvectors").join(format!("{name}.digest"));
-    fs::write(&hex_path, hex::encode(bytes))?;
-    fs::write(&digest_path, hex::encode(digest))?;
+    let mut hex_body = hex::encode(bytes);
+    hex_body.push('\n');
+    let mut digest_body = hex::encode(digest);
+    digest_body.push('\n');
+    fs::write(&hex_path, hex_body)?;
+    fs::write(&digest_path, digest_body)?;
     Ok(())
 }
 
@@ -21,6 +25,59 @@ fn main() -> anyhow::Result<()> {
     fs::create_dir_all("testvectors")?;
 
     let domain = "ucf-core";
+
+    let mut macro_actions = vec!["recompute-digest".to_string(), "replay-signature".to_string()];
+    ensure_sorted(&mut macro_actions);
+    let mut replay_reason_codes = vec!["epoch-mismatch".to_string(), "vrf-replay".to_string()];
+    ensure_sorted(&mut replay_reason_codes);
+
+    let micro_align = MicroMilestone {
+        id: "micro-calibrate".to_string(),
+        objective: "Calibrate edge sensors".to_string(),
+        deliverables: vec!["calibration-report".to_string(), "sensor-map".to_string()],
+        owner: "scout".to_string(),
+    };
+    let micro_scout = MicroMilestone {
+        id: "micro-scout".to_string(),
+        objective: "Scout safe corridor".to_string(),
+        deliverables: vec!["intel-brief".to_string(), "route-plan".to_string()],
+        owner: "scout".to_string(),
+    };
+    let meso_path = MesoMilestone {
+        id: "meso-staging".to_string(),
+        objective: "Stage corridor expansion".to_string(),
+        micro_milestones: vec![micro_align.clone(), micro_scout.clone()],
+        steward: "orchestrator".to_string(),
+    };
+    let macro_frontier = MacroMilestone {
+        id: "macro-frontier".to_string(),
+        objective: "Expand frontier safely".to_string(),
+        meso_milestones: vec![meso_path.clone()],
+        sponsor: "mission-control".to_string(),
+    };
+
+    let replay_plan = ReplayPlan {
+        plan_id: "replay-epoch-17".to_string(),
+        trigger: "finalization-drift".to_string(),
+        reason_codes: Some(ReasonCodes {
+            codes: replay_reason_codes,
+        }),
+        actions: macro_actions,
+    };
+
+    let consistency_feedback_low = ConsistencyFeedback {
+        level: ConsistencyLevel::Low as i32,
+        reason_codes: Some(ReasonCodes { codes: vec!["state-divergence".to_string()] }),
+        summary: "Observed drift from baseline state".to_string(),
+    };
+
+    let mut high_reasons = vec!["multi-hop-consistency".to_string(), "self-check".to_string()];
+    ensure_sorted(&mut high_reasons);
+    let consistency_feedback_high = ConsistencyFeedback {
+        level: ConsistencyLevel::High as i32,
+        reason_codes: Some(ReasonCodes { codes: high_reasons }),
+        summary: "High alignment across recursive states".to_string(),
+    };
 
     let mut query_selectors = vec!["foo".to_string(), "bar".to_string()];
     ensure_sorted(&mut query_selectors);
@@ -197,6 +254,23 @@ fn main() -> anyhow::Result<()> {
     ] {
         let bytes = canonical_bytes(&record);
         let digest = digest32(domain, "ucf.v1.ExperienceRecord", "1", &bytes);
+        write_fixture(name, &bytes, digest)?;
+    }
+
+    let macro_bytes = canonical_bytes(&macro_frontier);
+    let macro_digest = digest32(domain, "ucf.v1.MacroMilestone", "1", &macro_bytes);
+    write_fixture("macro_milestone_chain", &macro_bytes, macro_digest)?;
+
+    let replay_bytes = canonical_bytes(&replay_plan);
+    let replay_digest = digest32(domain, "ucf.v1.ReplayPlan", "1", &replay_bytes);
+    write_fixture("replay_plan_triggered", &replay_bytes, replay_digest)?;
+
+    for (name, feedback) in [
+        ("consistency_feedback_low", consistency_feedback_low),
+        ("consistency_feedback_high", consistency_feedback_high),
+    ] {
+        let bytes = canonical_bytes(&feedback);
+        let digest = digest32(domain, "ucf.v1.ConsistencyFeedback", "1", &bytes);
         write_fixture(name, &bytes, digest)?;
     }
 

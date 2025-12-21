@@ -15,6 +15,9 @@ const PVGS_SCHEMA: &str = "ucf.v1.PVGSReceipt";
 const SIGNAL_FRAME_SCHEMA: &str = "ucf.v1.SignalFrame";
 const CONTROL_FRAME_SCHEMA: &str = "ucf.v1.ControlFrame";
 const EXPERIENCE_SCHEMA: &str = "ucf.v1.ExperienceRecord";
+const MACRO_MILESTONE_SCHEMA: &str = "ucf.v1.MacroMilestone";
+const REPLAY_PLAN_SCHEMA: &str = "ucf.v1.ReplayPlan";
+const CONSISTENCY_FEEDBACK_SCHEMA: &str = "ucf.v1.ConsistencyFeedback";
 const VERSION: &str = "1";
 
 fn load_fixture(name: &str) -> Result<(Vec<u8>, [u8; 32])> {
@@ -281,4 +284,76 @@ fn experience_record_rt_output_roundtrip() -> Result<()> {
     };
 
     verify_roundtrip("experience_rt_output", EXPERIENCE_SCHEMA, expected)
+}
+
+#[test]
+fn macro_milestone_chain_roundtrip() -> Result<()> {
+    let expected = MacroMilestone {
+        id: "macro-frontier".to_string(),
+        objective: "Expand frontier safely".to_string(),
+        meso_milestones: vec![MesoMilestone {
+            id: "meso-staging".to_string(),
+            objective: "Stage corridor expansion".to_string(),
+            micro_milestones: vec![
+                MicroMilestone {
+                    id: "micro-calibrate".to_string(),
+                    objective: "Calibrate edge sensors".to_string(),
+                    deliverables: vec!["calibration-report".to_string(), "sensor-map".to_string()],
+                    owner: "scout".to_string(),
+                },
+                MicroMilestone {
+                    id: "micro-scout".to_string(),
+                    objective: "Scout safe corridor".to_string(),
+                    deliverables: vec!["intel-brief".to_string(), "route-plan".to_string()],
+                    owner: "scout".to_string(),
+                },
+            ],
+            steward: "orchestrator".to_string(),
+        }],
+        sponsor: "mission-control".to_string(),
+    };
+
+    verify_roundtrip("macro_milestone_chain", MACRO_MILESTONE_SCHEMA, expected)
+}
+
+#[test]
+fn replay_plan_triggered_roundtrip() -> Result<()> {
+    let mut actions = vec!["recompute-digest".to_string(), "replay-signature".to_string()];
+    actions.sort();
+    let mut reason_codes = vec!["epoch-mismatch".to_string(), "vrf-replay".to_string()];
+    reason_codes.sort();
+
+    let expected = ReplayPlan {
+        plan_id: "replay-epoch-17".to_string(),
+        trigger: "finalization-drift".to_string(),
+        reason_codes: Some(ReasonCodes { codes: reason_codes }),
+        actions,
+    };
+
+    verify_roundtrip("replay_plan_triggered", REPLAY_PLAN_SCHEMA, expected)
+}
+
+#[test]
+fn consistency_feedback_low_roundtrip() -> Result<()> {
+    let expected = ConsistencyFeedback {
+        level: ConsistencyLevel::Low as i32,
+        reason_codes: Some(ReasonCodes { codes: vec!["state-divergence".to_string()] }),
+        summary: "Observed drift from baseline state".to_string(),
+    };
+
+    verify_roundtrip("consistency_feedback_low", CONSISTENCY_FEEDBACK_SCHEMA, expected)
+}
+
+#[test]
+fn consistency_feedback_high_roundtrip() -> Result<()> {
+    let mut reason_codes = vec!["multi-hop-consistency".to_string(), "self-check".to_string()];
+    reason_codes.sort();
+
+    let expected = ConsistencyFeedback {
+        level: ConsistencyLevel::High as i32,
+        reason_codes: Some(ReasonCodes { codes: reason_codes }),
+        summary: "High alignment across recursive states".to_string(),
+    };
+
+    verify_roundtrip("consistency_feedback_high", CONSISTENCY_FEEDBACK_SCHEMA, expected)
 }

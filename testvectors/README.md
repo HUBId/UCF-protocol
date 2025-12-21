@@ -19,6 +19,10 @@ The fixtures currently included are:
 | experience_rt_perception | `ucf-core` | `ucf.v1.ExperienceRecord` | `1`     |
 | experience_rt_action_exec | `ucf-core` | `ucf.v1.ExperienceRecord` | `1`     |
 | experience_rt_output | `ucf-core` | `ucf.v1.ExperienceRecord` | `1`     |
+| macro_milestone_chain | `ucf-core` | `ucf.v1.MacroMilestone` | `1`     |
+| replay_plan_triggered | `ucf-core` | `ucf.v1.ReplayPlan` | `1`     |
+| consistency_feedback_low | `ucf-core` | `ucf.v1.ConsistencyFeedback` | `1`     |
+| consistency_feedback_high | `ucf-core` | `ucf.v1.ConsistencyFeedback` | `1`     |
 
 All repeated fields that represent sets are pre-sorted in the encoded bytes so
 that recomputation via the library helpers yields identical outputs.

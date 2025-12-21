@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+package ucf.v1;
+
+import "ucf/v1/common.proto";
+
+message MicroMilestone {
+  string id = 1;
+  string objective = 2;
+  repeated string deliverables = 3;
+  string owner = 4;
+}
+
+message MesoMilestone {
+  string id = 1;
+  string objective = 2;
+  repeated MicroMilestone micro_milestones = 3;
+  string steward = 4;
+}
+
+message MacroMilestone {
+  string id = 1;
+  string objective = 2;
+  repeated MesoMilestone meso_milestones = 3;
+  string sponsor = 4;
+}
+
+message ReplayPlan {
+  string plan_id = 1;
+  string trigger = 2;
+  ReasonCodes reason_codes = 3;
+  repeated string actions = 4;
+}
