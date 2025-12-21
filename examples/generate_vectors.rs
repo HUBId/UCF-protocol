@@ -272,6 +272,155 @@ fn main() -> anyhow::Result<()> {
         write_fixture(name, &bytes, digest)?;
     }
 
+    let mut classify_inputs = vec!["text/plain".to_string(), "image/png".to_string()];
+    ensure_sorted(&mut classify_inputs);
+    let classify_action = ToolActionProfile {
+        action_id: "tool-classify".to_string(),
+        display_name: "Classifier".to_string(),
+        tool_class: ToolClass::Model as i32,
+        input_types: classify_inputs,
+        output_type: "application/json".to_string(),
+        requires_approval: true,
+    };
+
+    let mut storage_inputs = vec!["application/json".to_string()];
+    ensure_sorted(&mut storage_inputs);
+    let storage_action = ToolActionProfile {
+        action_id: "tool-store".to_string(),
+        display_name: "Storage writer".to_string(),
+        tool_class: ToolClass::Storage as i32,
+        input_types: storage_inputs,
+        output_type: "application/octet-stream".to_string(),
+        requires_approval: false,
+    };
+
+    let mut actions = vec![classify_action.clone(), storage_action.clone()];
+    actions.sort_by(|a, b| a.action_id.cmp(&b.action_id));
+
+    let mut adapters = vec![
+        AdapterMapEntry {
+            adapter: "http-adapter".to_string(),
+            tool_id: "tool-classify".to_string(),
+            version: "v1.2.3".to_string(),
+        },
+        AdapterMapEntry {
+            adapter: "s3-adapter".to_string(),
+            tool_id: "tool-store".to_string(),
+            version: "v2.0".to_string(),
+        },
+    ];
+    adapters.sort_by(|a, b| a.adapter.cmp(&b.adapter));
+
+    let registry_container = ToolRegistryContainer {
+        actions,
+        adapters,
+        steward: "registry-admin".to_string(),
+        updated_at: 1_700_000_000,
+    };
+
+    let onboarding_event = ToolOnboardingEvent {
+        tool_id: "tool-classify".to_string(),
+        submitted_by: "ops-team".to_string(),
+        profile: Some(classify_action.clone()),
+        review_status: "accepted".to_string(),
+    };
+
+    let registry_bytes = canonical_bytes(&registry_container);
+    let registry_digest = digest32(domain, "ucf.v1.ToolRegistryContainer", "1", &registry_bytes);
+    write_fixture("tool_registry_container", &registry_bytes, registry_digest)?;
+
+    let onboarding_bytes = canonical_bytes(&onboarding_event);
+    let onboarding_digest = digest32(domain, "ucf.v1.ToolOnboardingEvent", "1", &onboarding_bytes);
+    write_fixture("tool_onboarding_event", &onboarding_bytes, onboarding_digest)?;
+
+    let mut objectives = vec![
+        "capture approvals".to_string(),
+        "ensure auditability".to_string(),
+    ];
+    ensure_sorted(&mut objectives);
+
+    let mut approval_reasons = vec!["policy-aligned".to_string(), "risk-low".to_string()];
+    ensure_sorted(&mut approval_reasons);
+    let approval = ApprovalDecision {
+        approver: "lead-operator".to_string(),
+        decision: DecisionForm::Allow as i32,
+        reason_codes: Some(ReasonCodes { codes: approval_reasons }),
+        summary: "Approved for pilot".to_string(),
+    };
+
+    let mut recovery_steps = vec!["notify-owner".to_string(), "reset-plan".to_string()];
+    ensure_sorted(&mut recovery_steps);
+    let recovery = RecoveryCase {
+        trigger: "missing-approval".to_string(),
+        steps: recovery_steps,
+        owner: "duty-officer".to_string(),
+    };
+
+    let stop_event = StopEvent {
+        reason: "completed".to_string(),
+        actor: "supervisor".to_string(),
+        timestamp: 1_700_001_234,
+        summary: "Plan concluded".to_string(),
+    };
+
+    let aap = Aap {
+        plan_id: "aap-42".to_string(),
+        session_id: "session-9000".to_string(),
+        objectives,
+        approvals: vec![approval],
+        recoveries: vec![recovery],
+        stop_event: Some(stop_event),
+    };
+
+    let aap_bytes = canonical_bytes(&aap);
+    let aap_digest = digest32(domain, "ucf.v1.AAP", "1", &aap_bytes);
+    write_fixture("aap_with_recovery", &aap_bytes, aap_digest)?;
+
+    let mut parent_events = vec!["evt-root".to_string(), "evt-boot".to_string()];
+    ensure_sorted(&mut parent_events);
+    let sep_event = SepEvent {
+        session_id: "session-9000".to_string(),
+        event_id: "evt-1".to_string(),
+        phase: "plan".to_string(),
+        parents: parent_events,
+        payload: "kickoff".to_string(),
+        timestamp: 1_700_002_000,
+        summary: "Initial planning event".to_string(),
+    };
+
+    let sep_bytes = canonical_bytes(&sep_event);
+    let sep_digest = digest32(domain, "ucf.v1.SepEvent", "1", &sep_bytes);
+    write_fixture("sep_event_chain", &sep_bytes, sep_digest)?;
+
+    let session_seal = SessionSeal {
+        session_id: "session-9000".to_string(),
+        record_digest: Some(Digest32 { value: vec![0xAB; 32] }),
+        signer: Some(Signature {
+            algorithm: "ed25519".to_string(),
+            signer: vec![0xAA, 0xBB, 0xCC],
+            signature: vec![0x01, 0x02, 0x03, 0x04],
+        }),
+        sealed_at: 1_700_002_500,
+        summary: "Session closed".to_string(),
+    };
+
+    let seal_bytes = canonical_bytes(&session_seal);
+    let seal_digest = digest32(domain, "ucf.v1.SessionSeal", "1", &seal_bytes);
+    write_fixture("session_seal", &seal_bytes, seal_digest)?;
+
+    let completeness_report = CompletenessReport {
+        session_id: "session-9000".to_string(),
+        observed_events: 3,
+        expected_events: 3,
+        terminal: true,
+        summary: "All planned events observed".to_string(),
+    };
+
+    let completeness_bytes = canonical_bytes(&completeness_report);
+    let completeness_digest =
+        digest32(domain, "ucf.v1.CompletenessReport", "1", &completeness_bytes);
+    write_fixture("completeness_report", &completeness_bytes, completeness_digest)?;
+
     println!("Fixtures written to testvectors/");
     Ok(())
 }

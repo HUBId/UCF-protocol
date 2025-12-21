@@ -18,6 +18,12 @@ const EXPERIENCE_SCHEMA: &str = "ucf.v1.ExperienceRecord";
 const MACRO_MILESTONE_SCHEMA: &str = "ucf.v1.MacroMilestone";
 const REPLAY_PLAN_SCHEMA: &str = "ucf.v1.ReplayPlan";
 const CONSISTENCY_FEEDBACK_SCHEMA: &str = "ucf.v1.ConsistencyFeedback";
+const TOOL_REGISTRY_SCHEMA: &str = "ucf.v1.ToolRegistryContainer";
+const TOOL_ONBOARDING_SCHEMA: &str = "ucf.v1.ToolOnboardingEvent";
+const AAP_SCHEMA: &str = "ucf.v1.AAP";
+const SEP_EVENT_SCHEMA: &str = "ucf.v1.SepEvent";
+const SESSION_SEAL_SCHEMA: &str = "ucf.v1.SessionSeal";
+const COMPLETENESS_REPORT_SCHEMA: &str = "ucf.v1.CompletenessReport";
 const VERSION: &str = "1";
 
 fn load_fixture(name: &str) -> Result<(Vec<u8>, [u8; 32])> {
@@ -356,4 +362,165 @@ fn consistency_feedback_high_roundtrip() -> Result<()> {
     };
 
     verify_roundtrip("consistency_feedback_high", CONSISTENCY_FEEDBACK_SCHEMA, expected)
+}
+
+#[test]
+fn tool_registry_container_roundtrip() -> Result<()> {
+    let mut classify_inputs = vec!["image/png".to_string(), "text/plain".to_string()];
+    classify_inputs.sort();
+    let classify_action = ToolActionProfile {
+        action_id: "tool-classify".to_string(),
+        display_name: "Classifier".to_string(),
+        tool_class: ToolClass::Model as i32,
+        input_types: classify_inputs,
+        output_type: "application/json".to_string(),
+        requires_approval: true,
+    };
+
+    let mut storage_inputs = vec!["application/json".to_string()];
+    storage_inputs.sort();
+    let storage_action = ToolActionProfile {
+        action_id: "tool-store".to_string(),
+        display_name: "Storage writer".to_string(),
+        tool_class: ToolClass::Storage as i32,
+        input_types: storage_inputs,
+        output_type: "application/octet-stream".to_string(),
+        requires_approval: false,
+    };
+
+    let mut actions = vec![classify_action.clone(), storage_action.clone()];
+    actions.sort_by(|a, b| a.action_id.cmp(&b.action_id));
+
+    let mut adapters = vec![
+        AdapterMapEntry {
+            adapter: "http-adapter".to_string(),
+            tool_id: "tool-classify".to_string(),
+            version: "v1.2.3".to_string(),
+        },
+        AdapterMapEntry {
+            adapter: "s3-adapter".to_string(),
+            tool_id: "tool-store".to_string(),
+            version: "v2.0".to_string(),
+        },
+    ];
+    adapters.sort_by(|a, b| a.adapter.cmp(&b.adapter));
+
+    let expected = ToolRegistryContainer {
+        actions,
+        adapters,
+        steward: "registry-admin".to_string(),
+        updated_at: 1_700_000_000,
+    };
+
+    verify_roundtrip("tool_registry_container", TOOL_REGISTRY_SCHEMA, expected)
+}
+
+#[test]
+fn tool_onboarding_event_roundtrip() -> Result<()> {
+    let mut classify_inputs = vec!["image/png".to_string(), "text/plain".to_string()];
+    classify_inputs.sort();
+    let classify_action = ToolActionProfile {
+        action_id: "tool-classify".to_string(),
+        display_name: "Classifier".to_string(),
+        tool_class: ToolClass::Model as i32,
+        input_types: classify_inputs,
+        output_type: "application/json".to_string(),
+        requires_approval: true,
+    };
+
+    let expected = ToolOnboardingEvent {
+        tool_id: "tool-classify".to_string(),
+        submitted_by: "ops-team".to_string(),
+        profile: Some(classify_action),
+        review_status: "accepted".to_string(),
+    };
+
+    verify_roundtrip("tool_onboarding_event", TOOL_ONBOARDING_SCHEMA, expected)
+}
+
+#[test]
+fn aap_with_recovery_roundtrip() -> Result<()> {
+    let mut objectives = vec!["capture approvals".to_string(), "ensure auditability".to_string()];
+    objectives.sort();
+
+    let mut approval_reasons = vec!["policy-aligned".to_string(), "risk-low".to_string()];
+    approval_reasons.sort();
+    let approval = ApprovalDecision {
+        approver: "lead-operator".to_string(),
+        decision: DecisionForm::Allow as i32,
+        reason_codes: Some(ReasonCodes { codes: approval_reasons }),
+        summary: "Approved for pilot".to_string(),
+    };
+
+    let mut recovery_steps = vec!["notify-owner".to_string(), "reset-plan".to_string()];
+    recovery_steps.sort();
+    let recovery = RecoveryCase {
+        trigger: "missing-approval".to_string(),
+        steps: recovery_steps,
+        owner: "duty-officer".to_string(),
+    };
+
+    let expected = Aap {
+        plan_id: "aap-42".to_string(),
+        session_id: "session-9000".to_string(),
+        objectives,
+        approvals: vec![approval],
+        recoveries: vec![recovery],
+        stop_event: Some(StopEvent {
+            reason: "completed".to_string(),
+            actor: "supervisor".to_string(),
+            timestamp: 1_700_001_234,
+            summary: "Plan concluded".to_string(),
+        }),
+    };
+
+    verify_roundtrip("aap_with_recovery", AAP_SCHEMA, expected)
+}
+
+#[test]
+fn sep_event_chain_roundtrip() -> Result<()> {
+    let mut parent_events = vec!["evt-boot".to_string(), "evt-root".to_string()];
+    parent_events.sort();
+
+    let expected = SepEvent {
+        session_id: "session-9000".to_string(),
+        event_id: "evt-1".to_string(),
+        phase: "plan".to_string(),
+        parents: parent_events,
+        payload: "kickoff".to_string(),
+        timestamp: 1_700_002_000,
+        summary: "Initial planning event".to_string(),
+    };
+
+    verify_roundtrip("sep_event_chain", SEP_EVENT_SCHEMA, expected)
+}
+
+#[test]
+fn session_seal_roundtrip() -> Result<()> {
+    let expected = SessionSeal {
+        session_id: "session-9000".to_string(),
+        record_digest: Some(Digest32 { value: vec![0xAB; 32] }),
+        signer: Some(Signature {
+            algorithm: "ed25519".to_string(),
+            signer: vec![0xAA, 0xBB, 0xCC],
+            signature: vec![0x01, 0x02, 0x03, 0x04],
+        }),
+        sealed_at: 1_700_002_500,
+        summary: "Session closed".to_string(),
+    };
+
+    verify_roundtrip("session_seal", SESSION_SEAL_SCHEMA, expected)
+}
+
+#[test]
+fn completeness_report_roundtrip() -> Result<()> {
+    let expected = CompletenessReport {
+        session_id: "session-9000".to_string(),
+        observed_events: 3,
+        expected_events: 3,
+        terminal: true,
+        summary: "All planned events observed".to_string(),
+    };
+
+    verify_roundtrip("completeness_report", COMPLETENESS_REPORT_SCHEMA, expected)
 }
