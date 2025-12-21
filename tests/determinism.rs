@@ -104,17 +104,8 @@ fn pvgs_receipt_fixture_roundtrip() -> Result<()> {
 fn signal_frame_fixture_roundtrip() -> Result<()> {
     let expected = SignalFrame {
         window: "window-5m".to_string(),
-        policy_stats: Some(PolicyStats {
-            evaluated: 15,
-            allowed: 12,
-            denied: 2,
-            deferred: 1,
-        }),
-        dlp_stats: Some(DlpStats {
-            scanned: 8,
-            flagged: 2,
-            blocked: 1,
-        }),
+        policy_stats: Some(PolicyStats { evaluated: 15, allowed: 12, denied: 2, deferred: 1 }),
+        dlp_stats: Some(DlpStats { scanned: 8, flagged: 2, blocked: 1 }),
         exec_stats: Some(ExecStats {
             runs_started: 5,
             runs_completed: 4,
@@ -126,11 +117,7 @@ fn signal_frame_fixture_roundtrip() -> Result<()> {
             remaining_tokens: 8192,
             overage_tokens: 0,
         }),
-        receipt_stats: Some(ReceiptStats {
-            accepted: 10,
-            rejected: 1,
-            errored: 1,
-        }),
+        receipt_stats: Some(ReceiptStats { accepted: 10, rejected: 1, errored: 1 }),
         human_stats: Some(HumanStats {
             approvals_requested: 2,
             approvals_granted: 1,
@@ -152,10 +139,7 @@ fn control_frame_fixture_roundtrip() -> Result<()> {
             audit_trail_enabled: true,
         }),
         toolclass_masks: vec![
-            ToolClassMask {
-                tool_class: ToolClass::Model as i32,
-                action: MaskAction::Allow as i32,
-            },
+            ToolClassMask { tool_class: ToolClass::Model as i32, action: MaskAction::Allow as i32 },
             ToolClassMask {
                 tool_class: ToolClass::Executor as i32,
                 action: MaskAction::RequireHuman as i32,
