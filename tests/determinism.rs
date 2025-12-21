@@ -12,6 +12,8 @@ const DOMAIN: &str = "ucf-core";
 const INTENT_SCHEMA: &str = "ucf.v1.CanonicalIntent";
 const POLICY_SCHEMA: &str = "ucf.v1.PolicyDecision";
 const PVGS_SCHEMA: &str = "ucf.v1.PVGSReceipt";
+const SIGNAL_FRAME_SCHEMA: &str = "ucf.v1.SignalFrame";
+const CONTROL_FRAME_SCHEMA: &str = "ucf.v1.ControlFrame";
 const VERSION: &str = "1";
 
 fn load_fixture(name: &str) -> Result<(Vec<u8>, [u8; 32])> {
@@ -96,4 +98,59 @@ fn pvgs_receipt_fixture_roundtrip() -> Result<()> {
     };
 
     verify_roundtrip("pvgs_receipt", PVGS_SCHEMA, expected)
+}
+
+#[test]
+fn signal_frame_fixture_roundtrip() -> Result<()> {
+    let expected = SignalFrame {
+        window: "window-5m".to_string(),
+        policy_stats: Some(PolicyStats { evaluated: 15, allowed: 12, denied: 2, deferred: 1 }),
+        dlp_stats: Some(DlpStats { scanned: 8, flagged: 2, blocked: 1 }),
+        exec_stats: Some(ExecStats {
+            runs_started: 5,
+            runs_completed: 4,
+            runs_failed: 1,
+            tokens_consumed: 4096,
+        }),
+        budget_stats: Some(BudgetStats {
+            consumed_tokens: 4096,
+            remaining_tokens: 8192,
+            overage_tokens: 0,
+        }),
+        receipt_stats: Some(ReceiptStats { accepted: 10, rejected: 1, errored: 1 }),
+        human_stats: Some(HumanStats {
+            approvals_requested: 2,
+            approvals_granted: 1,
+            escalations: 1,
+            overrides: 0,
+        }),
+    };
+
+    verify_roundtrip("signal_frame_short_window", SIGNAL_FRAME_SCHEMA, expected)
+}
+
+#[test]
+fn control_frame_fixture_roundtrip() -> Result<()> {
+    let expected = ControlFrame {
+        profile: "M1".to_string(),
+        overlays: Some(OverlayControls {
+            state: OverlayState::Enabled as i32,
+            watermark_enabled: true,
+            audit_trail_enabled: true,
+        }),
+        toolclass_masks: vec![
+            ToolClassMask { tool_class: ToolClass::Model as i32, action: MaskAction::Allow as i32 },
+            ToolClassMask {
+                tool_class: ToolClass::Executor as i32,
+                action: MaskAction::RequireHuman as i32,
+            },
+        ],
+        threshold_modifiers: Some(ThresholdModifiers {
+            safety: ThresholdBehavior::Stricter as i32,
+            privacy: ThresholdBehavior::Unchanged as i32,
+            budget: ThresholdBehavior::Relaxed as i32,
+        }),
+    };
+
+    verify_roundtrip("control_frame_m1_overlays_on", CONTROL_FRAME_SCHEMA, expected)
 }

@@ -1,0 +1,115 @@
+syntax = "proto3";
+
+package ucf.v1;
+
+import "ucf/v1/common.proto";
+
+// Aggregated streaming signals emitted on a cadence.
+message SignalFrame {
+  // Identifier for the window (for example, epoch or rolling window label).
+  string window = 1;
+  // Policy evaluation statistics.
+  PolicyStats policy_stats = 2;
+  // Data loss prevention statistics.
+  DlpStats dlp_stats = 3;
+  // Executor/runtime statistics.
+  ExecStats exec_stats = 4;
+  // Budget consumption statistics.
+  BudgetStats budget_stats = 5;
+  // Receipt verification statistics.
+  ReceiptStats receipt_stats = 6;
+  // Human review and intervention statistics.
+  HumanStats human_stats = 7;
+}
+
+message PolicyStats {
+  uint64 evaluated = 1;
+  uint64 allowed = 2;
+  uint64 denied = 3;
+  uint64 deferred = 4;
+}
+
+message DlpStats {
+  uint64 scanned = 1;
+  uint64 flagged = 2;
+  uint64 blocked = 3;
+}
+
+message ExecStats {
+  uint64 runs_started = 1;
+  uint64 runs_completed = 2;
+  uint64 runs_failed = 3;
+  uint64 tokens_consumed = 4;
+}
+
+message BudgetStats {
+  uint64 consumed_tokens = 1;
+  uint64 remaining_tokens = 2;
+  uint64 overage_tokens = 3;
+}
+
+message ReceiptStats {
+  uint64 accepted = 1;
+  uint64 rejected = 2;
+  uint64 errored = 3;
+}
+
+message HumanStats {
+  uint64 approvals_requested = 1;
+  uint64 approvals_granted = 2;
+  uint64 escalations = 3;
+  uint64 overrides = 4;
+}
+
+// Controls distributed alongside streaming signals.
+message ControlFrame {
+  string profile = 1;
+  OverlayControls overlays = 2;
+  repeated ToolClassMask toolclass_masks = 3;
+  ThresholdModifiers threshold_modifiers = 4;
+}
+
+message OverlayControls {
+  OverlayState state = 1;
+  bool watermark_enabled = 2;
+  bool audit_trail_enabled = 3;
+}
+
+enum OverlayState {
+  OVERLAY_STATE_UNSPECIFIED = 0;
+  OVERLAY_STATE_DISABLED = 1;
+  OVERLAY_STATE_ENABLED = 2;
+}
+
+message ToolClassMask {
+  ToolClass tool_class = 1;
+  MaskAction action = 2;
+}
+
+enum ToolClass {
+  TOOL_CLASS_UNSPECIFIED = 0;
+  TOOL_CLASS_MODEL = 1;
+  TOOL_CLASS_CONNECTOR = 2;
+  TOOL_CLASS_EXECUTOR = 3;
+  TOOL_CLASS_STORAGE = 4;
+}
+
+enum MaskAction {
+  MASK_ACTION_UNSPECIFIED = 0;
+  MASK_ACTION_ALLOW = 1;
+  MASK_ACTION_DENY = 2;
+  MASK_ACTION_REQUIRE_HUMAN = 3;
+}
+
+message ThresholdModifiers {
+  ThresholdBehavior safety = 1;
+  ThresholdBehavior privacy = 2;
+  ThresholdBehavior budget = 3;
+}
+
+enum ThresholdBehavior {
+  THRESHOLD_BEHAVIOR_UNSPECIFIED = 0;
+  THRESHOLD_BEHAVIOR_STRICTER = 1;
+  THRESHOLD_BEHAVIOR_RELAXED = 2;
+  THRESHOLD_BEHAVIOR_UNCHANGED = 3;
+}
