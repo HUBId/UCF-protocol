@@ -14,6 +14,7 @@ const POLICY_SCHEMA: &str = "ucf.v1.PolicyDecision";
 const PVGS_SCHEMA: &str = "ucf.v1.PVGSReceipt";
 const SIGNAL_FRAME_SCHEMA: &str = "ucf.v1.SignalFrame";
 const CONTROL_FRAME_SCHEMA: &str = "ucf.v1.ControlFrame";
+const EXPERIENCE_SCHEMA: &str = "ucf.v1.ExperienceRecord";
 const VERSION: &str = "1";
 
 fn load_fixture(name: &str) -> Result<(Vec<u8>, [u8; 32])> {
@@ -153,4 +154,131 @@ fn control_frame_fixture_roundtrip() -> Result<()> {
     };
 
     verify_roundtrip("control_frame_m1_overlays_on", CONTROL_FRAME_SCHEMA, expected)
+}
+
+#[test]
+fn experience_record_rt_perception_roundtrip() -> Result<()> {
+    let expected = ExperienceRecord {
+        record_type: RuntimeRecordType::RtPerception as i32,
+        core: Some(CoreFrame {
+            intent_id: "intent-rt".to_string(),
+            session_id: "session-42".to_string(),
+            step_id: "perception-1".to_string(),
+            actor: "sensor-bridge".to_string(),
+            description: "ingest perception stream".to_string(),
+        }),
+        metabolic: Some(MetabolicFrame {
+            prompt_tokens: 128,
+            completion_tokens: 0,
+            latency_ms: 25,
+            cache_hit: false,
+        }),
+        governance: Some(GovernanceFrame {
+            decision: DecisionForm::Allow as i32,
+            reason_codes: Some(ReasonCodes { codes: vec!["perception-baseline".to_string()] }),
+            constraints_applied: vec!["sanitized-inputs".to_string()],
+        }),
+        finalization: Some(FinalizationHeader {
+            epoch_id: 17,
+            charter_digest: "charter:v1".to_string(),
+            profile_digest: Some(Digest32 { value: vec![0x10; 32] }),
+            prev_record_digest: Some(Digest32 { value: vec![0x00; 32] }),
+            record_digest: Some(Digest32 { value: vec![0x01; 32] }),
+            vrf_proof: Some(Signature {
+                algorithm: "TEMPORARY_VRF".to_string(),
+                signer: vec![0xAA, 0xBB, 0xCC, 0xDD],
+                signature: vec![0x01, 0x23, 0x45, 0x67, 0x89],
+            }),
+        }),
+    };
+
+    verify_roundtrip("experience_rt_perception", EXPERIENCE_SCHEMA, expected)
+}
+
+#[test]
+fn experience_record_rt_action_exec_roundtrip() -> Result<()> {
+    let mut constraints = vec!["rate-limit".to_string(), "humans-in-loop".to_string()];
+    constraints.sort();
+    let mut reason_codes = vec!["approval-required".to_string(), "safety-review".to_string()];
+    reason_codes.sort();
+
+    let expected = ExperienceRecord {
+        record_type: RuntimeRecordType::RtActionExec as i32,
+        core: Some(CoreFrame {
+            intent_id: "intent-rt".to_string(),
+            session_id: "session-42".to_string(),
+            step_id: "action-2".to_string(),
+            actor: "agent-core".to_string(),
+            description: "execute action plan".to_string(),
+        }),
+        metabolic: Some(MetabolicFrame {
+            prompt_tokens: 256,
+            completion_tokens: 128,
+            latency_ms: 40,
+            cache_hit: true,
+        }),
+        governance: Some(GovernanceFrame {
+            decision: DecisionForm::RequireApproval as i32,
+            reason_codes: Some(ReasonCodes { codes: reason_codes }),
+            constraints_applied: constraints,
+        }),
+        finalization: Some(FinalizationHeader {
+            epoch_id: 17,
+            charter_digest: "charter:v1".to_string(),
+            profile_digest: Some(Digest32 { value: vec![0x20; 32] }),
+            prev_record_digest: Some(Digest32 { value: vec![0x01; 32] }),
+            record_digest: Some(Digest32 { value: vec![0x02; 32] }),
+            vrf_proof: Some(Signature {
+                algorithm: "TEMPORARY_VRF".to_string(),
+                signer: vec![0xAA, 0xBB, 0xCC, 0xDD],
+                signature: vec![0x02, 0x24, 0x46, 0x68, 0x8A],
+            }),
+        }),
+    };
+
+    verify_roundtrip("experience_rt_action_exec", EXPERIENCE_SCHEMA, expected)
+}
+
+#[test]
+fn experience_record_rt_output_roundtrip() -> Result<()> {
+    let mut constraints = vec!["output-audited".to_string(), "watermark-applied".to_string()];
+    constraints.sort();
+    let mut reason_codes = vec!["output-ready".to_string()];
+    reason_codes.sort();
+
+    let expected = ExperienceRecord {
+        record_type: RuntimeRecordType::RtOutput as i32,
+        core: Some(CoreFrame {
+            intent_id: "intent-rt".to_string(),
+            session_id: "session-42".to_string(),
+            step_id: "output-3".to_string(),
+            actor: "renderer".to_string(),
+            description: "deliver output to user".to_string(),
+        }),
+        metabolic: Some(MetabolicFrame {
+            prompt_tokens: 64,
+            completion_tokens: 512,
+            latency_ms: 30,
+            cache_hit: false,
+        }),
+        governance: Some(GovernanceFrame {
+            decision: DecisionForm::Allow as i32,
+            reason_codes: Some(ReasonCodes { codes: reason_codes }),
+            constraints_applied: constraints,
+        }),
+        finalization: Some(FinalizationHeader {
+            epoch_id: 17,
+            charter_digest: "charter:v1".to_string(),
+            profile_digest: Some(Digest32 { value: vec![0x30; 32] }),
+            prev_record_digest: Some(Digest32 { value: vec![0x02; 32] }),
+            record_digest: Some(Digest32 { value: vec![0x03; 32] }),
+            vrf_proof: Some(Signature {
+                algorithm: "TEMPORARY_VRF".to_string(),
+                signer: vec![0xAA, 0xBB, 0xCC, 0xDD],
+                signature: vec![0x03, 0x25, 0x47, 0x69, 0x8B],
+            }),
+        }),
+    };
+
+    verify_roundtrip("experience_rt_output", EXPERIENCE_SCHEMA, expected)
 }
