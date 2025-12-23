@@ -5,8 +5,44 @@ on:
   pull_request:
 
 jobs:
+  protocol-guardrails:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install protoc
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Validate proto enums include UNSPECIFIED zero value
+        run: |
+          missing=$(rg --files-without-match "_UNSPECIFIED = 0;" proto || true)
+          if [ -n "$missing" ]; then
+            echo "Enums without *_UNSPECIFIED = 0 detected:" && echo "$missing" && exit 1
+          fi
+
+      - name: Ensure no map fields are introduced
+        run: |
+          if rg "map<" proto; then
+            echo "map<> fields are not allowed in protocol buffers" && exit 1
+          fi
+
+      - name: Build protobufs via cargo
+        run: cargo build --all-targets --all-features
+
+      - name: Confirm generated Rust bindings exist
+        run: |
+          generated=$(find target -name "ucf.v1.rs" | head -n 1)
+          if [ -z "$generated" ]; then
+            echo "Generated Rust protobuf bindings are missing" && exit 1
+          fi
+
   build-and-test:
     runs-on: ubuntu-latest
+    needs: protocol-guardrails
     steps:
       - name: Checkout
         uses: actions/checkout@v4
