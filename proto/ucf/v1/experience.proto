@@ -3,54 +3,94 @@ syntax = "proto3";
 package ucf.v1;
 
 import "ucf/v1/common.proto";
+import "ucf/v1/canonical.proto";
+import "ucf/v1/policy.proto";
+import "ucf/v1/pvgs.proto";
+import "ucf/v1/frames.proto";
 
-// Enumerates runtime record types emitted by the UCF runtime.
-enum RuntimeRecordType {
-  RUNTIME_RECORD_TYPE_UNSPECIFIED = 0;
-  RUNTIME_RECORD_TYPE_RT_PERCEPTION = 1;
-  RUNTIME_RECORD_TYPE_RT_ACTION_EXEC = 2;
-  RUNTIME_RECORD_TYPE_RT_OUTPUT = 3;
+enum NoiseClass {
+  NOISE_CLASS_UNSPECIFIED = 0;
+  NOISE_CLASS_LOW = 1;
+  NOISE_CLASS_MED = 2;
+  NOISE_CLASS_HIGH = 3;
 }
 
-// Core signals for an experience record that describe the activity context.
+enum PriorityClass {
+  PRIORITY_CLASS_UNSPECIFIED = 0;
+  PRIORITY_CLASS_LOW = 1;
+  PRIORITY_CLASS_MED = 2;
+  PRIORITY_CLASS_HIGH = 3;
+}
+
+enum WorkMode {
+  WORK_MODE_UNSPECIFIED = 0;
+  WORK_MODE_WM_SIMULATE = 1;
+  WORK_MODE_WM_EXEC_PLAN = 2;
+  WORK_MODE_WM_STABILIZE = 3;
+  WORK_MODE_WM_REPORT = 4;
+}
+
 message CoreFrame {
-  string intent_id = 1;
+  string core_frame_id = 1;
   string session_id = 2;
   string step_id = 3;
-  string actor = 4;
-  string description = 5;
+  repeated Ref input_packet_refs = 4;  // bounded list
+  Ref self_state_ref = 5;               // optional for now
+  repeated Ref intent_refs = 6;
+  repeated Ref candidate_refs = 7;
+  WorkMode workspace_mode = 8;
+  Digest32 core_embedding_digest = 9;
+  ReasonCodes reason_codes = 10;
 }
 
-// Metabolic signals emitted by the runtime.
 message MetabolicFrame {
-  uint64 prompt_tokens = 1;
-  uint64 completion_tokens = 2;
-  uint64 latency_ms = 3;
-  bool cache_hit = 4;
+  string metabolic_frame_id = 1;
+  ProfileState profile_state = 2;
+  Ref control_frame_ref = 3;
+  LevelClass arousal_class = 4;
+  LevelClass threat_class = 5;
+  LevelClass stability_class = 6;
+  LevelClass progress_class = 7;
+  NoiseClass noise_class = 8;
+  PriorityClass priority_class = 9;
+  Ref hpa_baseline_ref = 10;
+  ReasonCodes reason_codes = 11;
 }
 
-// Governance decision signals bundled with the record.
 message GovernanceFrame {
-  DecisionForm decision = 1;
-  ReasonCodes reason_codes = 2;
-  repeated string constraints_applied = 3;
+  string governance_frame_id = 1;
+  repeated Ref policy_decision_refs = 2;
+  repeated Ref grant_refs = 3;
+  repeated Ref dlp_refs = 4;
+  Ref budget_snapshot_ref = 5;
+  Ref pvgs_receipt_ref = 6;
+  ReasonCodes reason_codes = 7;
 }
 
-// Finalization metadata for chaining experience records.
 message FinalizationHeader {
-  uint64 epoch_id = 1;
-  string charter_digest = 2;
-  Digest32 profile_digest = 3;
-  Digest32 prev_record_digest = 4;
-  Digest32 record_digest = 5;
-  Signature vrf_proof = 6;
+  uint64 experience_id = 1;
+  uint64 timestamp_ms = 2;
+  Digest32 prev_record_digest = 3;
+  Digest32 record_digest = 4;
+  Ref vrf_digest_ref = 5;
+  Ref proof_receipt_ref = 6;
+  string charter_version_digest = 7;
+  string policy_version_digest = 8;
+  uint64 key_epoch_id = 9;
 }
 
-// Aggregated experience record emitted by the runtime.
 message ExperienceRecord {
-  RuntimeRecordType record_type = 1;
-  CoreFrame core = 2;
-  MetabolicFrame metabolic = 3;
-  GovernanceFrame governance = 4;
-  FinalizationHeader finalization = 5;
+  RecordType record_type = 1;  // RT_PERCEPTION, RT_ACTION_EXEC, RT_OUTPUT, RT_DECISION, RT_REPLAY, RT_CONSOLIDATION
+  Ref core_frame_ref = 2;      // required for RT_PERCEPTION/RT_ACTION_EXEC/RT_OUTPUT
+  Ref metabolic_frame_ref = 3; // optional for RT_DECISION/RT_REPLAY, present otherwise
+  Ref governance_frame_ref = 4; // required for RT_ACTION_EXEC/RT_OUTPUT/RT_DECISION
+  FinalizationHeader finalization_header = 5;
+  repeated Ref related_refs = 6; // bounded; order significant for determinism
+
+  // Required references per RecordType:
+  // RT_ACTION_EXEC: governance_frame_ref required; typically pvgs_receipt_ref present when gate enabled
+  // RT_OUTPUT: governance_frame_ref required with dlp_refs non-empty
+  // RT_DECISION: governance_frame_ref required with policy_decision_refs non-empty
+  // RT_REPLAY: related_refs must include replay_plan digest ref (id="replay_plan" in client code)
+  // RT_CONSOLIDATION: related_refs include milestone refs
 }

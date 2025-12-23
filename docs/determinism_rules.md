@@ -10,6 +10,9 @@ messages.
   sets (for example `ReasonCodes.codes`) MUST be sorted lexicographically before
   serialization. Such set-like lists SHOULD also be bounded by the caller to
   prevent unbounded growth when forming digests.
+* `ExperienceRecord.related_refs` is ordered and MUST be produced in a stable
+  order by upstream systems. The producer is responsible for pinning an order
+  (for example sorted by label or URI) before serialization.
 * Reason codes that are carried directly (for example `ReasonCodes.codes`) or
   wrapped (for example `TopReasonCodes.reason_codes`) MUST be sorted
   lexicographically before computing canonical bytes or digests.
