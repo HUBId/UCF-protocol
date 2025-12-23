@@ -30,7 +30,9 @@ const SESSION_SEAL_SCHEMA: &str = "ucf.v1.SessionSeal";
 const COMPLETENESS_REPORT_SCHEMA: &str = "ucf.v1.CompletenessReport";
 const UCF_ENVELOPE_SCHEMA: &str = "ucf.v1.UcfEnvelope";
 const REASON_CODES_SCHEMA: &str = "ucf.v1.ReasonCodes";
+const MICRO_CIRCUIT_SCHEMA: &str = "ucf.v1.MicrocircuitConfigEvidence";
 const VERSION: &str = "1";
+const MICRO_CIRCUIT_DOMAIN: &str = "UCF:HASH:MC_CONFIG";
 
 struct FixtureCase {
     name: &'static str,
@@ -52,6 +54,7 @@ const PROTO_FILES: &[&str] = &[
     "proto/ucf/v1/milestones.proto",
     "proto/ucf/v1/geist.proto",
     "proto/ucf/v1/sep.proto",
+    "proto/ucf/v1/microcircuit.proto",
 ];
 
 fn sorted_strings(items: &[&str]) -> Vec<String> {
@@ -76,13 +79,20 @@ fn verify_case<M>(name: &str, schema: &str, expected: M) -> Result<()>
 where
     M: Message + Default + Clone,
 {
+    verify_case_with_domain(name, schema, DOMAIN, expected)
+}
+
+fn verify_case_with_domain<M>(name: &str, schema: &str, domain: &str, expected: M) -> Result<()>
+where
+    M: Message + Default + Clone,
+{
     let (fixture_bytes, fixture_digest) = load_fixture(name)?;
 
     let decoded = M::decode(fixture_bytes.as_slice())?;
     let encoded = canonical_bytes(&decoded);
     assert_eq!(fixture_bytes, encoded, "canonical bytes should be stable");
 
-    let digest = digest32(DOMAIN, schema, VERSION, &encoded);
+    let digest = digest32(domain, schema, VERSION, &encoded);
     assert_eq!(fixture_digest, digest, "digest should match stored fixture");
 
     // Regenerate bytes from an explicitly constructed message to ensure parity.
@@ -628,6 +638,53 @@ fn micro_milestone_sealed_case() -> Result<()> {
     };
 
     verify_case("micro_milestone_sealed", MICRO_MILESTONE_SCHEMA, expected)
+}
+
+fn microcircuit_config_lc_case() -> Result<()> {
+    let expected = MicrocircuitConfigEvidence {
+        module: MicroModule::Lc as i32,
+        config_version: 1,
+        config_digest: Some(Digest32 { value: vec![0x10; 32] }),
+        created_at_ms: 1_700_123_456,
+        prev_config_digest: None,
+        proof_receipt_ref: Some(Ref {
+            uri: "proof://microcircuit/config/receipt-1".to_string(),
+            label: "receipt".to_string(),
+        }),
+        attestation_sig: Some(Signature {
+            algorithm: "ed25519".to_string(),
+            signer: vec![0x01, 0x02, 0x03, 0x04],
+            signature: vec![0x05, 0x06, 0x07, 0x08],
+        }),
+        attestation_key_id: Some("attest-key-1".to_string()),
+    };
+
+    verify_case_with_domain(
+        "microcircuit_config_lc_v1",
+        MICRO_CIRCUIT_SCHEMA,
+        MICRO_CIRCUIT_DOMAIN,
+        expected,
+    )
+}
+
+fn microcircuit_config_sn_case() -> Result<()> {
+    let expected = MicrocircuitConfigEvidence {
+        module: MicroModule::Sn as i32,
+        config_version: 1,
+        config_digest: Some(Digest32 { value: vec![0x22; 32] }),
+        created_at_ms: 1_700_123_999,
+        prev_config_digest: Some(Digest32 { value: vec![0x11; 32] }),
+        proof_receipt_ref: None,
+        attestation_sig: None,
+        attestation_key_id: None,
+    };
+
+    verify_case_with_domain(
+        "microcircuit_config_sn_v1",
+        MICRO_CIRCUIT_SCHEMA,
+        MICRO_CIRCUIT_DOMAIN,
+        expected,
+    )
 }
 
 fn meso_milestone_stable_case() -> Result<()> {
@@ -1193,6 +1250,18 @@ const FIXTURE_CASES: &[FixtureCase] = &[
         schema: MICRO_MILESTONE_SCHEMA,
         proto_files: &["proto/ucf/v1/milestones.proto", "proto/ucf/v1/common.proto"],
         verify: micro_milestone_sealed_case,
+    },
+    FixtureCase {
+        name: "microcircuit_config_lc_v1",
+        schema: MICRO_CIRCUIT_SCHEMA,
+        proto_files: &["proto/ucf/v1/microcircuit.proto", "proto/ucf/v1/common.proto"],
+        verify: microcircuit_config_lc_case,
+    },
+    FixtureCase {
+        name: "microcircuit_config_sn_v1",
+        schema: MICRO_CIRCUIT_SCHEMA,
+        proto_files: &["proto/ucf/v1/microcircuit.proto", "proto/ucf/v1/common.proto"],
+        verify: microcircuit_config_sn_case,
     },
     FixtureCase {
         name: "policy_decision",

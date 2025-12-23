@@ -39,6 +39,7 @@ fn emit_fixture<M: Message>(
 fn main() -> anyhow::Result<()> {
     fs::create_dir_all("testvectors")?;
     let domain = "ucf-core";
+    let microcircuit_domain = "UCF:HASH:MC_CONFIG";
 
     let canonical_intent = CanonicalIntent {
         intent_id: "intent-123".to_string(),
@@ -767,6 +768,49 @@ fn main() -> anyhow::Result<()> {
         "ucf.v1.ConsistencyFeedback",
         &consistency_feedback,
         domain,
+    )?;
+
+    let microcircuit_config_lc = MicrocircuitConfigEvidence {
+        module: MicroModule::Lc as i32,
+        config_version: 1,
+        config_digest: Some(Digest32 { value: vec![0x10; 32] }),
+        created_at_ms: 1_700_123_456,
+        prev_config_digest: None,
+        proof_receipt_ref: Some(Ref {
+            uri: "proof://microcircuit/config/receipt-1".to_string(),
+            label: "receipt".to_string(),
+        }),
+        attestation_sig: Some(Signature {
+            algorithm: "ed25519".to_string(),
+            signer: vec![0x01, 0x02, 0x03, 0x04],
+            signature: vec![0x05, 0x06, 0x07, 0x08],
+        }),
+        attestation_key_id: Some("attest-key-1".to_string()),
+    };
+
+    emit_fixture(
+        "microcircuit_config_lc_v1",
+        "ucf.v1.MicrocircuitConfigEvidence",
+        &microcircuit_config_lc,
+        microcircuit_domain,
+    )?;
+
+    let microcircuit_config_sn = MicrocircuitConfigEvidence {
+        module: MicroModule::Sn as i32,
+        config_version: 1,
+        config_digest: Some(Digest32 { value: vec![0x22; 32] }),
+        created_at_ms: 1_700_123_999,
+        prev_config_digest: Some(Digest32 { value: vec![0x11; 32] }),
+        proof_receipt_ref: None,
+        attestation_sig: None,
+        attestation_key_id: None,
+    };
+
+    emit_fixture(
+        "microcircuit_config_sn_v1",
+        "ucf.v1.MicrocircuitConfigEvidence",
+        &microcircuit_config_sn,
+        microcircuit_domain,
     )?;
     emit_fixture(
         "tool_registry_container",
