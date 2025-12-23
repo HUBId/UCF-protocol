@@ -26,8 +26,11 @@ The fixtures currently included are:
 | consistency_feedback_low_flags | `ucf-core` | `ucf.v1.ConsistencyFeedback` | `1`     |
 | tool_registry_container | `ucf-core` | `ucf.v1.ToolRegistryContainer` | `1`     |
 | tool_onboarding_event | `ucf-core` | `ucf.v1.ToolOnboardingEvent` | `1`     |
-| aap_with_recovery | `ucf-core` | `ucf.v1.AAP` | `1`     |
-| sep_event_chain | `ucf-core` | `ucf.v1.SepEvent` | `1`     |
+| approval_artifact_package | `ucf-core` | `ucf.v1.ApprovalArtifactPackage` | `1`     |
+| approval_decision | `ucf-core` | `ucf.v1.ApprovalDecision` | `1`     |
+| sep_event_chain_1 | `ucf-core` | `ucf.v1.SepEvent` | `1`     |
+| sep_event_chain_2 | `ucf-core` | `ucf.v1.SepEvent` | `1`     |
+| sep_event_chain_3 | `ucf-core` | `ucf.v1.SepEvent` | `1`     |
 | session_seal | `ucf-core` | `ucf.v1.SessionSeal` | `1`     |
 | completeness_report | `ucf-core` | `ucf.v1.CompletenessReport` | `1`     |
 

@@ -3,32 +3,68 @@ syntax = "proto3";
 package ucf.v1;
 
 import "ucf/v1/common.proto";
+import "ucf/v1/experience.proto";
+import "ucf/v1/pvgs.proto";
 
-// Runtime event flowing through the SEP chain.
+enum SepEventType {
+  SEP_EVENT_TYPE_UNSPECIFIED = 0;
+  SEP_EVENT_TYPE_EV_AGENT_STEP = 1;
+  SEP_EVENT_TYPE_EV_INTENT = 2;
+  SEP_EVENT_TYPE_EV_DECISION = 3;
+  SEP_EVENT_TYPE_EV_GRANT = 4;
+  SEP_EVENT_TYPE_EV_EXEC_REQUEST = 5;
+  SEP_EVENT_TYPE_EV_OUTCOME = 6;
+  SEP_EVENT_TYPE_EV_DLP_DECISION = 7;
+  SEP_EVENT_TYPE_EV_TRANSFORM = 8;
+  SEP_EVENT_TYPE_EV_INPUT_DELIVERY = 9;
+  SEP_EVENT_TYPE_EV_PROFILE_CHANGE = 10;
+  SEP_EVENT_TYPE_EV_OVERLAY_CHANGE = 11;
+  SEP_EVENT_TYPE_EV_INCIDENT = 12;
+  SEP_EVENT_TYPE_EV_RECOVERY = 13;
+  SEP_EVENT_TYPE_EV_MILESTONE = 14;
+  SEP_EVENT_TYPE_EV_REPLAY = 15;
+  SEP_EVENT_TYPE_EV_TOOL_ONBOARDING = 16;
+  SEP_EVENT_TYPE_EV_CHARTER_UPDATE = 17;
+  SEP_EVENT_TYPE_EV_PEV_UPDATE = 18;
+}
+
+enum CompletenessStatus {
+  COMPLETENESS_STATUS_UNSPECIFIED = 0;
+  COMPLETENESS_STATUS_COMP_OK = 1;
+  COMPLETENESS_STATUS_COMP_DEGRADED = 2;
+  COMPLETENESS_STATUS_COMP_FAIL = 3;
+}
+
 message SepEvent {
-  string session_id = 1;
-  string event_id = 2;
-  string phase = 3;
-  repeated string parents = 4;
-  string payload = 5;
-  uint64 timestamp = 6;
-  optional string summary = 7;
+  string event_id = 1;
+  string session_id = 2;
+  SepEventType event_type = 3;
+  Ref object_ref = 4;
+  ReasonCodes reason_codes = 5;
+  uint64 timestamp_ms = 6;
+  Digest32 prev_event_digest = 7;
+  Digest32 event_digest = 8;
+  Signature attestation_sig = 9;
+  uint64 epoch_id = 10;
 }
 
-// Immutable seal applied when a session finishes.
 message SessionSeal {
-  string session_id = 1;
-  Digest32 record_digest = 2;
-  Signature signer = 3;
-  uint64 sealed_at = 4;
-  optional string summary = 5;
+  string seal_id = 1;
+  Digest32 seal_digest = 2;
+  string session_id = 3;
+  Digest32 final_event_digest = 4;
+  Digest32 final_record_digest = 5;
+  Ref proof_receipt_ref = 6;
+  uint64 created_at_ms = 7;
 }
 
-// Report describing expected versus observed activity.
 message CompletenessReport {
-  string session_id = 1;
-  uint64 observed_events = 2;
-  uint64 expected_events = 3;
-  bool terminal = 4;
-  optional string summary = 5;
+  string report_id = 1;
+  Digest32 report_digest = 2;
+  string session_id = 3;
+  CompletenessStatus status = 4;
+  repeated Ref missing_nodes = 5;
+  repeated string missing_edges = 6;
+  ReasonCodes reason_codes = 7;
+  Ref proof_receipt_ref = 8;
 }
