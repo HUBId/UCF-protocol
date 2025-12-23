@@ -1,5 +1,6 @@
 #![forbid(unsafe_code)]
 
+use std::collections::HashSet;
 use std::fs;
 
 use anyhow::{Context, Result};
@@ -27,7 +28,31 @@ const APPROVAL_DECISION_SCHEMA: &str = "ucf.v1.ApprovalDecision";
 const SEP_EVENT_SCHEMA: &str = "ucf.v1.SepEvent";
 const SESSION_SEAL_SCHEMA: &str = "ucf.v1.SessionSeal";
 const COMPLETENESS_REPORT_SCHEMA: &str = "ucf.v1.CompletenessReport";
+const UCF_ENVELOPE_SCHEMA: &str = "ucf.v1.UcfEnvelope";
+const REASON_CODES_SCHEMA: &str = "ucf.v1.ReasonCodes";
 const VERSION: &str = "1";
+
+struct FixtureCase {
+    name: &'static str,
+    schema: &'static str,
+    proto_files: &'static [&'static str],
+    verify: fn() -> Result<()>,
+}
+
+const PROTO_FILES: &[&str] = &[
+    "proto/ucf/v1/common.proto",
+    "proto/ucf/v1/envelope.proto",
+    "proto/ucf/v1/canonical.proto",
+    "proto/ucf/v1/tooling.proto",
+    "proto/ucf/v1/human.proto",
+    "proto/ucf/v1/policy.proto",
+    "proto/ucf/v1/pvgs.proto",
+    "proto/ucf/v1/frames.proto",
+    "proto/ucf/v1/experience.proto",
+    "proto/ucf/v1/milestones.proto",
+    "proto/ucf/v1/geist.proto",
+    "proto/ucf/v1/sep.proto",
+];
 
 fn sorted_strings(items: &[&str]) -> Vec<String> {
     let mut values: Vec<String> = items.iter().map(|item| item.to_string()).collect();
@@ -47,7 +72,7 @@ fn load_fixture(name: &str) -> Result<(Vec<u8>, [u8; 32])> {
     Ok((bytes, digest))
 }
 
-fn verify_roundtrip<M>(name: &str, schema: &str, expected: M) -> Result<()>
+fn verify_case<M>(name: &str, schema: &str, expected: M) -> Result<()>
 where
     M: Message + Default + Clone,
 {
@@ -67,8 +92,30 @@ where
     Ok(())
 }
 
-#[test]
-fn canonical_intent_fixture_roundtrip() -> Result<()> {
+fn reason_codes_basic_case() -> Result<()> {
+    let expected = ReasonCodes { codes: vec!["deterministic".to_string(), "coverage".to_string()] };
+
+    verify_case("reason_codes_basic", REASON_CODES_SCHEMA, expected)
+}
+
+fn ucf_envelope_policy_decision_case() -> Result<()> {
+    let expected = UcfEnvelope {
+        epoch_id: "epoch-1".to_string(),
+        nonce: vec![0x01, 0x02, 0x03, 0x04],
+        signature: Some(Signature {
+            algorithm: "ed25519".to_string(),
+            signer: vec![0xAA, 0xBB, 0xCC],
+            signature: vec![0x11, 0x22, 0x33, 0x44],
+        }),
+        payload_digest: Some(Digest32 { value: vec![0x10; 32] }),
+        msg_type: MsgType::PolicyDecision as i32,
+        payload: vec![0xDE, 0xAD, 0xBE, 0xEF],
+    };
+
+    verify_case("ucf_envelope_policy_decision", UCF_ENVELOPE_SCHEMA, expected)
+}
+
+fn canonical_intent_fixture_case() -> Result<()> {
     let expected = CanonicalIntent {
         intent_id: "intent-123".to_string(),
         channel: Channel::Realtime as i32,
@@ -84,11 +131,10 @@ fn canonical_intent_fixture_roundtrip() -> Result<()> {
         })),
     };
 
-    verify_roundtrip("canonical_intent_query", INTENT_SCHEMA, expected)
+    verify_case("canonical_intent_query", INTENT_SCHEMA, expected)
 }
 
-#[test]
-fn policy_decision_fixture_roundtrip() -> Result<()> {
+fn policy_decision_fixture_case() -> Result<()> {
     let expected = PolicyDecision {
         decision: DecisionForm::RequireApproval as i32,
         reason_codes: Some(ReasonCodes {
@@ -100,11 +146,10 @@ fn policy_decision_fixture_roundtrip() -> Result<()> {
         }),
     };
 
-    verify_roundtrip("policy_decision", POLICY_SCHEMA, expected)
+    verify_case("policy_decision", POLICY_SCHEMA, expected)
 }
 
-#[test]
-fn pvgs_receipt_fixture_roundtrip() -> Result<()> {
+fn pvgs_receipt_fixture_case() -> Result<()> {
     let expected = PvgsReceipt {
         status: ReceiptStatus::Accepted as i32,
         program_digest: Some(Digest32 { value: (0u8..32).collect() }),
@@ -116,11 +161,10 @@ fn pvgs_receipt_fixture_roundtrip() -> Result<()> {
         }),
     };
 
-    verify_roundtrip("pvgs_receipt", PVGS_SCHEMA, expected)
+    verify_case("pvgs_receipt", PVGS_SCHEMA, expected)
 }
 
-#[test]
-fn signal_frame_fixture_roundtrip() -> Result<()> {
+fn signal_frame_fixture_case() -> Result<()> {
     let mut aggregate_reason_codes =
         vec!["budget-tight".to_string(), "policy-deny".to_string(), "receipt-missing".to_string()];
     aggregate_reason_codes.sort();
@@ -201,11 +245,10 @@ fn signal_frame_fixture_roundtrip() -> Result<()> {
         reason_codes: Some(ReasonCodes { codes: aggregate_reason_codes }),
     };
 
-    verify_roundtrip("signal_frame_short_window", SIGNAL_FRAME_SCHEMA, expected)
+    verify_case("signal_frame_short_window", SIGNAL_FRAME_SCHEMA, expected)
 }
 
-#[test]
-fn control_frame_fixture_roundtrip() -> Result<()> {
+fn control_frame_fixture_case() -> Result<()> {
     let mut profile_reason_codes = vec!["ml-ops".to_string(), "safety".to_string()];
     profile_reason_codes.sort();
 
@@ -241,11 +284,10 @@ fn control_frame_fixture_roundtrip() -> Result<()> {
         prev_control_frame_digest: Some(Digest32 { value: vec![0x44; 32] }),
     };
 
-    verify_roundtrip("control_frame_m1_overlays_on", CONTROL_FRAME_SCHEMA, expected)
+    verify_case("control_frame_m1_overlays_on", CONTROL_FRAME_SCHEMA, expected)
 }
 
-#[test]
-fn experience_record_rt_perception_roundtrip() -> Result<()> {
+fn experience_record_rt_perception_case() -> Result<()> {
     let input_packet_refs = vec![
         Ref { uri: "packet://ingest/0001".to_string(), label: "input-0001".to_string() },
         Ref { uri: "packet://ingest/0002".to_string(), label: "input-0002".to_string() },
@@ -326,11 +368,10 @@ fn experience_record_rt_perception_roundtrip() -> Result<()> {
         reason_codes: Some(ReasonCodes { codes: sorted_strings(&["metabolic-baseline"]) }),
     };
 
-    verify_roundtrip("experience_rt_perception", EXPERIENCE_SCHEMA, expected)
+    verify_case("experience_rt_perception", EXPERIENCE_SCHEMA, expected)
 }
 
-#[test]
-fn experience_record_rt_action_exec_roundtrip() -> Result<()> {
+fn experience_record_rt_action_exec_case() -> Result<()> {
     let related_refs = vec![
         Ref { uri: "policy://query/001".to_string(), label: "policy_query".to_string() },
         Ref { uri: "policy://decision/001".to_string(), label: "policy_decision".to_string() },
@@ -442,11 +483,10 @@ fn experience_record_rt_action_exec_roundtrip() -> Result<()> {
         reason_codes: Some(ReasonCodes { codes: sorted_strings(&["policy-check", "pvgs-gate"]) }),
     };
 
-    verify_roundtrip("experience_rt_action_exec", EXPERIENCE_SCHEMA, expected)
+    verify_case("experience_rt_action_exec", EXPERIENCE_SCHEMA, expected)
 }
 
-#[test]
-fn experience_record_rt_output_roundtrip() -> Result<()> {
+fn experience_record_rt_output_case() -> Result<()> {
     let related_refs = vec![
         Ref { uri: "artifact://output/777".to_string(), label: "output_artifact".to_string() },
         Ref { uri: "dlp://scan/final".to_string(), label: "dlp-scan".to_string() },
@@ -551,11 +591,10 @@ fn experience_record_rt_output_roundtrip() -> Result<()> {
         }),
     };
 
-    verify_roundtrip("experience_rt_output", EXPERIENCE_SCHEMA, expected)
+    verify_case("experience_rt_output", EXPERIENCE_SCHEMA, expected)
 }
 
-#[test]
-fn micro_milestone_sealed_roundtrip() -> Result<()> {
+fn micro_milestone_sealed_case() -> Result<()> {
     let mut theme_tags = vec!["alignment".to_string(), "staging".to_string()];
     theme_tags.sort();
     let mut reason_codes = vec!["checkpoint".to_string(), "sealed".to_string()];
@@ -588,11 +627,10 @@ fn micro_milestone_sealed_roundtrip() -> Result<()> {
         reason_codes: Some(ReasonCodes { codes: reason_codes }),
     };
 
-    verify_roundtrip("micro_milestone_sealed", MICRO_MILESTONE_SCHEMA, expected)
+    verify_case("micro_milestone_sealed", MICRO_MILESTONE_SCHEMA, expected)
 }
 
-#[test]
-fn meso_milestone_stable_roundtrip() -> Result<()> {
+fn meso_milestone_stable_case() -> Result<()> {
     let mut theme_tags = vec!["consolidation".to_string(), "stability".to_string()];
     theme_tags.sort();
     let mut micro_refs = vec![
@@ -622,11 +660,10 @@ fn meso_milestone_stable_roundtrip() -> Result<()> {
         }),
     };
 
-    verify_roundtrip("meso_milestone_stable", MESO_MILESTONE_SCHEMA, expected)
+    verify_case("meso_milestone_stable", MESO_MILESTONE_SCHEMA, expected)
 }
 
-#[test]
-fn macro_milestone_finalized_roundtrip() -> Result<()> {
+fn macro_milestone_finalized_case() -> Result<()> {
     let mut meso_refs =
         vec![Ref { uri: "ucf://meso/bridge".to_string(), label: "meso-bridge".to_string() }];
     meso_refs.sort_by(|a, b| a.uri.cmp(&b.uri));
@@ -671,11 +708,10 @@ fn macro_milestone_finalized_roundtrip() -> Result<()> {
         }),
     };
 
-    verify_roundtrip("macro_milestone_finalized", MACRO_MILESTONE_SCHEMA, expected)
+    verify_case("macro_milestone_finalized", MACRO_MILESTONE_SCHEMA, expected)
 }
 
-#[test]
-fn replay_plan_high_fidelity_roundtrip() -> Result<()> {
+fn replay_plan_high_fidelity_case() -> Result<()> {
     let mut target_refs = vec![
         Ref { uri: "ucf://macro/root".to_string(), label: "macro-root".to_string() },
         Ref { uri: "ucf://meso/bridge".to_string(), label: "meso-bridge".to_string() },
@@ -705,11 +741,10 @@ fn replay_plan_high_fidelity_roundtrip() -> Result<()> {
         proof_receipt_ref: None,
     };
 
-    verify_roundtrip("replay_plan_high_fidelity", REPLAY_PLAN_SCHEMA, expected)
+    verify_case("replay_plan_high_fidelity", REPLAY_PLAN_SCHEMA, expected)
 }
 
-#[test]
-fn consistency_feedback_low_flags_roundtrip() -> Result<()> {
+fn consistency_feedback_low_flags_case() -> Result<()> {
     let mut ism_refs = vec![
         Ref { uri: "ucf://macro/root".to_string(), label: "macro-anchor".to_string() },
         Ref { uri: "ucf://ism/123".to_string(), label: "ism".to_string() },
@@ -746,11 +781,10 @@ fn consistency_feedback_low_flags_roundtrip() -> Result<()> {
         }),
     };
 
-    verify_roundtrip("consistency_feedback_low_flags", CONSISTENCY_FEEDBACK_SCHEMA, expected)
+    verify_case("consistency_feedback_low_flags", CONSISTENCY_FEEDBACK_SCHEMA, expected)
 }
 
-#[test]
-fn tool_registry_container_roundtrip() -> Result<()> {
+fn tool_registry_container_case() -> Result<()> {
     let default_constraints = ToolConstraintsDefaults {
         max_bytes_out_class: SizeClass::SizeSmall as i32,
         max_items_out_class: SizeClass::SizeMed as i32,
@@ -846,11 +880,10 @@ fn tool_registry_container_roundtrip() -> Result<()> {
         }),
     };
 
-    verify_roundtrip("tool_registry_container", TOOL_REGISTRY_SCHEMA, expected)
+    verify_case("tool_registry_container", TOOL_REGISTRY_SCHEMA, expected)
 }
 
-#[test]
-fn tool_onboarding_event_roundtrip() -> Result<()> {
+fn tool_onboarding_event_case() -> Result<()> {
     let expected = ToolOnboardingEvent {
         event_id: "onboard-evt-01".to_string(),
         event_digest: Some(Digest32 { value: vec![0x0A; 32] }),
@@ -882,11 +915,10 @@ fn tool_onboarding_event_roundtrip() -> Result<()> {
         }),
     };
 
-    verify_roundtrip("tool_onboarding_event", TOOL_ONBOARDING_SCHEMA, expected)
+    verify_case("tool_onboarding_event", TOOL_ONBOARDING_SCHEMA, expected)
 }
 
-#[test]
-fn approval_artifact_package_roundtrip() -> Result<()> {
+fn approval_artifact_package_case() -> Result<()> {
     let alternatives = vec![
         Alternative {
             alt_type: AlternativeType::SimulateFirst as i32,
@@ -939,11 +971,10 @@ fn approval_artifact_package_roundtrip() -> Result<()> {
         two_person_requirement: TwoPersonRequirement::Two as i32,
     };
 
-    verify_roundtrip("approval_artifact_package", APPROVAL_ARTIFACT_PACKAGE_SCHEMA, expected)
+    verify_case("approval_artifact_package", APPROVAL_ARTIFACT_PACKAGE_SCHEMA, expected)
 }
 
-#[test]
-fn approval_decision_roundtrip() -> Result<()> {
+fn approval_decision_case() -> Result<()> {
     let expected = ApprovalDecision {
         approval_id: "approval-01".to_string(),
         approval_digest: Some(Digest32 { value: vec![0x55; 32] }),
@@ -972,11 +1003,10 @@ fn approval_decision_roundtrip() -> Result<()> {
         }),
     };
 
-    verify_roundtrip("approval_decision", APPROVAL_DECISION_SCHEMA, expected)
+    verify_case("approval_decision", APPROVAL_DECISION_SCHEMA, expected)
 }
 
-#[test]
-fn sep_event_chain_roundtrip() -> Result<()> {
+fn sep_event_chain_case() -> Result<()> {
     let events = vec![
         (
             "sep_event_chain_1",
@@ -1047,14 +1077,13 @@ fn sep_event_chain_roundtrip() -> Result<()> {
     ];
 
     for (name, expected) in events {
-        verify_roundtrip(name, SEP_EVENT_SCHEMA, expected.clone())?;
+        verify_case(name, SEP_EVENT_SCHEMA, expected.clone())?;
     }
 
     Ok(())
 }
 
-#[test]
-fn session_seal_roundtrip() -> Result<()> {
+fn session_seal_case() -> Result<()> {
     let expected = SessionSeal {
         seal_id: "seal-9000".to_string(),
         seal_digest: Some(Digest32 { value: vec![0xAB; 32] }),
@@ -1068,11 +1097,10 @@ fn session_seal_roundtrip() -> Result<()> {
         created_at_ms: 1_700_003_500,
     };
 
-    verify_roundtrip("session_seal", SESSION_SEAL_SCHEMA, expected)
+    verify_case("session_seal", SESSION_SEAL_SCHEMA, expected)
 }
 
-#[test]
-fn completeness_report_roundtrip() -> Result<()> {
+fn completeness_report_case() -> Result<()> {
     let expected = CompletenessReport {
         report_id: "comp-01".to_string(),
         report_digest: Some(Digest32 { value: vec![0xEF; 32] }),
@@ -1090,5 +1118,163 @@ fn completeness_report_roundtrip() -> Result<()> {
         }),
     };
 
-    verify_roundtrip("completeness_report", COMPLETENESS_REPORT_SCHEMA, expected)
+    verify_case("completeness_report", COMPLETENESS_REPORT_SCHEMA, expected)
+}
+
+const FIXTURE_CASES: &[FixtureCase] = &[
+    FixtureCase {
+        name: "approval_artifact_package",
+        schema: APPROVAL_ARTIFACT_PACKAGE_SCHEMA,
+        proto_files: &["proto/ucf/v1/human.proto", "proto/ucf/v1/common.proto"],
+        verify: approval_artifact_package_case,
+    },
+    FixtureCase {
+        name: "approval_decision",
+        schema: APPROVAL_DECISION_SCHEMA,
+        proto_files: &["proto/ucf/v1/human.proto", "proto/ucf/v1/common.proto"],
+        verify: approval_decision_case,
+    },
+    FixtureCase {
+        name: "canonical_intent_query",
+        schema: INTENT_SCHEMA,
+        proto_files: &["proto/ucf/v1/canonical.proto", "proto/ucf/v1/common.proto"],
+        verify: canonical_intent_fixture_case,
+    },
+    FixtureCase {
+        name: "completeness_report",
+        schema: COMPLETENESS_REPORT_SCHEMA,
+        proto_files: &["proto/ucf/v1/sep.proto", "proto/ucf/v1/common.proto"],
+        verify: completeness_report_case,
+    },
+    FixtureCase {
+        name: "consistency_feedback_low_flags",
+        schema: CONSISTENCY_FEEDBACK_SCHEMA,
+        proto_files: &["proto/ucf/v1/geist.proto", "proto/ucf/v1/common.proto"],
+        verify: consistency_feedback_low_flags_case,
+    },
+    FixtureCase {
+        name: "control_frame_m1_overlays_on",
+        schema: CONTROL_FRAME_SCHEMA,
+        proto_files: &["proto/ucf/v1/frames.proto", "proto/ucf/v1/common.proto"],
+        verify: control_frame_fixture_case,
+    },
+    FixtureCase {
+        name: "experience_rt_action_exec",
+        schema: EXPERIENCE_SCHEMA,
+        proto_files: &["proto/ucf/v1/experience.proto", "proto/ucf/v1/common.proto"],
+        verify: experience_record_rt_action_exec_case,
+    },
+    FixtureCase {
+        name: "experience_rt_output",
+        schema: EXPERIENCE_SCHEMA,
+        proto_files: &["proto/ucf/v1/experience.proto", "proto/ucf/v1/common.proto"],
+        verify: experience_record_rt_output_case,
+    },
+    FixtureCase {
+        name: "experience_rt_perception",
+        schema: EXPERIENCE_SCHEMA,
+        proto_files: &["proto/ucf/v1/experience.proto", "proto/ucf/v1/common.proto"],
+        verify: experience_record_rt_perception_case,
+    },
+    FixtureCase {
+        name: "macro_milestone_finalized",
+        schema: MACRO_MILESTONE_SCHEMA,
+        proto_files: &["proto/ucf/v1/milestones.proto", "proto/ucf/v1/common.proto"],
+        verify: macro_milestone_finalized_case,
+    },
+    FixtureCase {
+        name: "meso_milestone_stable",
+        schema: MESO_MILESTONE_SCHEMA,
+        proto_files: &["proto/ucf/v1/milestones.proto", "proto/ucf/v1/common.proto"],
+        verify: meso_milestone_stable_case,
+    },
+    FixtureCase {
+        name: "micro_milestone_sealed",
+        schema: MICRO_MILESTONE_SCHEMA,
+        proto_files: &["proto/ucf/v1/milestones.proto", "proto/ucf/v1/common.proto"],
+        verify: micro_milestone_sealed_case,
+    },
+    FixtureCase {
+        name: "policy_decision",
+        schema: POLICY_SCHEMA,
+        proto_files: &["proto/ucf/v1/policy.proto", "proto/ucf/v1/common.proto"],
+        verify: policy_decision_fixture_case,
+    },
+    FixtureCase {
+        name: "pvgs_receipt",
+        schema: PVGS_SCHEMA,
+        proto_files: &["proto/ucf/v1/pvgs.proto", "proto/ucf/v1/common.proto"],
+        verify: pvgs_receipt_fixture_case,
+    },
+    FixtureCase {
+        name: "reason_codes_basic",
+        schema: REASON_CODES_SCHEMA,
+        proto_files: &["proto/ucf/v1/common.proto"],
+        verify: reason_codes_basic_case,
+    },
+    FixtureCase {
+        name: "replay_plan_high_fidelity",
+        schema: REPLAY_PLAN_SCHEMA,
+        proto_files: &["proto/ucf/v1/milestones.proto", "proto/ucf/v1/common.proto"],
+        verify: replay_plan_high_fidelity_case,
+    },
+    FixtureCase {
+        name: "sep_event_chain_1",
+        schema: SEP_EVENT_SCHEMA,
+        proto_files: &["proto/ucf/v1/sep.proto", "proto/ucf/v1/common.proto"],
+        verify: sep_event_chain_case,
+    },
+    FixtureCase {
+        name: "session_seal",
+        schema: SESSION_SEAL_SCHEMA,
+        proto_files: &["proto/ucf/v1/sep.proto", "proto/ucf/v1/common.proto"],
+        verify: session_seal_case,
+    },
+    FixtureCase {
+        name: "signal_frame_short_window",
+        schema: SIGNAL_FRAME_SCHEMA,
+        proto_files: &["proto/ucf/v1/frames.proto", "proto/ucf/v1/common.proto"],
+        verify: signal_frame_fixture_case,
+    },
+    FixtureCase {
+        name: "tool_onboarding_event",
+        schema: TOOL_ONBOARDING_SCHEMA,
+        proto_files: &["proto/ucf/v1/tooling.proto", "proto/ucf/v1/common.proto"],
+        verify: tool_onboarding_event_case,
+    },
+    FixtureCase {
+        name: "tool_registry_container",
+        schema: TOOL_REGISTRY_SCHEMA,
+        proto_files: &["proto/ucf/v1/tooling.proto", "proto/ucf/v1/common.proto"],
+        verify: tool_registry_container_case,
+    },
+    FixtureCase {
+        name: "ucf_envelope_policy_decision",
+        schema: UCF_ENVELOPE_SCHEMA,
+        proto_files: &["proto/ucf/v1/envelope.proto", "proto/ucf/v1/common.proto"],
+        verify: ucf_envelope_policy_decision_case,
+    },
+];
+
+#[test]
+fn fixture_registry_is_complete() -> Result<()> {
+    let names: Vec<&str> = FIXTURE_CASES.iter().map(|case| case.name).collect();
+    let mut sorted = names.clone();
+    sorted.sort();
+    assert_eq!(names, sorted, "fixture registry should be sorted by name");
+
+    let mut covered_protos: HashSet<&str> = HashSet::new();
+    for case in FIXTURE_CASES {
+        assert!(!case.schema.is_empty(), "schema identifier must be set for {}", case.name);
+        (case.verify)()?;
+        for proto in case.proto_files {
+            covered_protos.insert(*proto);
+        }
+    }
+
+    for proto in PROTO_FILES {
+        assert!(covered_protos.contains(proto), "missing fixture coverage for {proto}");
+    }
+
+    Ok(())
 }
