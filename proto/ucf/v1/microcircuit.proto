@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package ucf.v1;
+
+import "ucf/v1/common.proto";
+
+enum MicroModule {
+  MICRO_MODULE_UNSPECIFIED = 0;
+  MICRO_MODULE_LC = 1;
+  MICRO_MODULE_SN = 2;
+  // optional future additions: AMYGDALA, HPA, etc.
+}
+
+message MicrocircuitConfigEvidence {
+  MicroModule module = 1;
+  uint32 config_version = 2;
+  Digest32 config_digest = 3;
+  uint64 created_at_ms = 4;
+  optional Digest32 prev_config_digest = 5;
+  optional Ref proof_receipt_ref = 6;
+  optional Signature attestation_sig = 7;
+  optional string attestation_key_id = 8;
+  // digest domain: "UCF:HASH:MC_CONFIG"
+  // signing domain: "UCF:SIGN:MC_CONFIG"
+}

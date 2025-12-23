@@ -34,6 +34,11 @@ where each component is UTF-8 encoded and concatenated without separators.
 
 The `digest32` helper implements this rule and returns a fixed 32-byte array.
 
+Some schemas define their own domain separators. For example,
+`MicrocircuitConfigEvidence` digests are computed with the
+`UCF:HASH:MC_CONFIG` domain instead of the `ucf-core` domain used by the core
+fixtures.
+
 ## Fixture expectations
 
 * Re-running canonical encoding on fixture messages MUST yield identical bytes.
