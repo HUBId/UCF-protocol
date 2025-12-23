@@ -26,6 +26,12 @@ const SESSION_SEAL_SCHEMA: &str = "ucf.v1.SessionSeal";
 const COMPLETENESS_REPORT_SCHEMA: &str = "ucf.v1.CompletenessReport";
 const VERSION: &str = "1";
 
+fn sorted_strings(items: &[&str]) -> Vec<String> {
+    let mut values: Vec<String> = items.iter().map(|item| item.to_string()).collect();
+    values.sort();
+    values
+}
+
 fn load_fixture(name: &str) -> Result<(Vec<u8>, [u8; 32])> {
     let hex_bytes = fs::read_to_string(format!("testvectors/{name}.hex"))
         .with_context(|| format!("reading {name}.hex"))?;
@@ -237,38 +243,84 @@ fn control_frame_fixture_roundtrip() -> Result<()> {
 
 #[test]
 fn experience_record_rt_perception_roundtrip() -> Result<()> {
+    let input_packet_refs = vec![
+        Ref { uri: "packet://ingest/0001".to_string(), label: "input-0001".to_string() },
+        Ref { uri: "packet://ingest/0002".to_string(), label: "input-0002".to_string() },
+    ];
+
+    let intent_refs = vec![
+        Ref { uri: "intent://primary/42".to_string(), label: "primary".to_string() },
+        Ref { uri: "intent://safety/42".to_string(), label: "safety".to_string() },
+    ];
+
+    let candidate_refs =
+        vec![Ref { uri: "candidate://lm/alpha".to_string(), label: "lm-alpha".to_string() }];
+
     let expected = ExperienceRecord {
-        record_type: RuntimeRecordType::RtPerception as i32,
-        core: Some(CoreFrame {
-            intent_id: "intent-rt".to_string(),
-            session_id: "session-42".to_string(),
-            step_id: "perception-1".to_string(),
-            actor: "sensor-bridge".to_string(),
-            description: "ingest perception stream".to_string(),
+        record_type: RecordType::RtPerception as i32,
+        core_frame_ref: Some(Ref {
+            uri: "core://perception/001".to_string(),
+            label: "core-frame".to_string(),
         }),
-        metabolic: Some(MetabolicFrame {
-            prompt_tokens: 128,
-            completion_tokens: 0,
-            latency_ms: 25,
-            cache_hit: false,
+        metabolic_frame_ref: Some(Ref {
+            uri: "metabolic://perception/001".to_string(),
+            label: "metabolic-frame".to_string(),
         }),
-        governance: Some(GovernanceFrame {
-            decision: DecisionForm::Allow as i32,
-            reason_codes: Some(ReasonCodes { codes: vec!["perception-baseline".to_string()] }),
-            constraints_applied: vec!["sanitized-inputs".to_string()],
-        }),
-        finalization: Some(FinalizationHeader {
-            epoch_id: 17,
-            charter_digest: "charter:v1".to_string(),
-            profile_digest: Some(Digest32 { value: vec![0x10; 32] }),
-            prev_record_digest: Some(Digest32 { value: vec![0x00; 32] }),
-            record_digest: Some(Digest32 { value: vec![0x01; 32] }),
-            vrf_proof: Some(Signature {
-                algorithm: "TEMPORARY_VRF".to_string(),
-                signer: vec![0xAA, 0xBB, 0xCC, 0xDD],
-                signature: vec![0x01, 0x23, 0x45, 0x67, 0x89],
+        governance_frame_ref: None,
+        finalization_header: Some(FinalizationHeader {
+            experience_id: 1_001,
+            timestamp_ms: 1_700_010_000,
+            prev_record_digest: Some(Digest32 { value: vec![0xAA; 32] }),
+            record_digest: Some(Digest32 { value: vec![0xBB; 32] }),
+            vrf_digest_ref: Some(Ref {
+                uri: "vrf://digest/seed".to_string(),
+                label: "vrf".to_string(),
             }),
+            proof_receipt_ref: Some(Ref {
+                uri: "proof://receipt/a".to_string(),
+                label: "proof".to_string(),
+            }),
+            charter_version_digest: "charter:v3".to_string(),
+            policy_version_digest: "policy:v5".to_string(),
+            key_epoch_id: 17,
         }),
+        related_refs: vec![],
+    };
+
+    let _core_frame = CoreFrame {
+        core_frame_id: "core-perception-001".to_string(),
+        session_id: "session-42".to_string(),
+        step_id: "perception-1".to_string(),
+        input_packet_refs,
+        self_state_ref: Some(Ref {
+            uri: "state://self/42".to_string(),
+            label: "baseline".to_string(),
+        }),
+        intent_refs,
+        candidate_refs,
+        workspace_mode: WorkMode::WmSimulate as i32,
+        core_embedding_digest: Some(Digest32 { value: vec![0x01; 32] }),
+        reason_codes: Some(ReasonCodes { codes: sorted_strings(&["ingest", "perception"]) }),
+    };
+
+    let _metabolic_frame = MetabolicFrame {
+        metabolic_frame_id: "metabolic-perception-001".to_string(),
+        profile_state: ProfileState::M1 as i32,
+        control_frame_ref: Some(Ref {
+            uri: "control://frame/17".to_string(),
+            label: "control".to_string(),
+        }),
+        arousal_class: LevelClass::Low as i32,
+        threat_class: LevelClass::Low as i32,
+        stability_class: LevelClass::High as i32,
+        progress_class: LevelClass::Med as i32,
+        noise_class: NoiseClass::Low as i32,
+        priority_class: PriorityClass::Low as i32,
+        hpa_baseline_ref: Some(Ref {
+            uri: "hpa://baseline/seed".to_string(),
+            label: "hpa".to_string(),
+        }),
+        reason_codes: Some(ReasonCodes { codes: sorted_strings(&["metabolic-baseline"]) }),
     };
 
     verify_roundtrip("experience_rt_perception", EXPERIENCE_SCHEMA, expected)
@@ -276,43 +328,115 @@ fn experience_record_rt_perception_roundtrip() -> Result<()> {
 
 #[test]
 fn experience_record_rt_action_exec_roundtrip() -> Result<()> {
-    let mut constraints = vec!["rate-limit".to_string(), "humans-in-loop".to_string()];
-    constraints.sort();
-    let mut reason_codes = vec!["approval-required".to_string(), "safety-review".to_string()];
-    reason_codes.sort();
+    let related_refs = vec![
+        Ref { uri: "policy://query/001".to_string(), label: "policy_query".to_string() },
+        Ref { uri: "policy://decision/001".to_string(), label: "policy_decision".to_string() },
+        Ref { uri: "policy://ruleset/alpha".to_string(), label: "ruleset".to_string() },
+    ];
+
+    let policy_decision_refs = vec![
+        Ref { uri: "policy://decision/001".to_string(), label: "decision-primary".to_string() },
+        Ref { uri: "policy://decision/002".to_string(), label: "decision-secondary".to_string() },
+    ];
+
+    let grant_refs = vec![
+        Ref { uri: "grant://budget/2024-01".to_string(), label: "budget-grant".to_string() },
+        Ref { uri: "grant://safety/alpha".to_string(), label: "safety-grant".to_string() },
+    ];
 
     let expected = ExperienceRecord {
-        record_type: RuntimeRecordType::RtActionExec as i32,
-        core: Some(CoreFrame {
-            intent_id: "intent-rt".to_string(),
-            session_id: "session-42".to_string(),
-            step_id: "action-2".to_string(),
-            actor: "agent-core".to_string(),
-            description: "execute action plan".to_string(),
+        record_type: RecordType::RtActionExec as i32,
+        core_frame_ref: Some(Ref {
+            uri: "core://action/002".to_string(),
+            label: "core-frame".to_string(),
         }),
-        metabolic: Some(MetabolicFrame {
-            prompt_tokens: 256,
-            completion_tokens: 128,
-            latency_ms: 40,
-            cache_hit: true,
+        metabolic_frame_ref: Some(Ref {
+            uri: "metabolic://action/002".to_string(),
+            label: "metabolic-frame".to_string(),
         }),
-        governance: Some(GovernanceFrame {
-            decision: DecisionForm::RequireApproval as i32,
-            reason_codes: Some(ReasonCodes { codes: reason_codes }),
-            constraints_applied: constraints,
+        governance_frame_ref: Some(Ref {
+            uri: "governance://action/002".to_string(),
+            label: "governance-frame".to_string(),
         }),
-        finalization: Some(FinalizationHeader {
-            epoch_id: 17,
-            charter_digest: "charter:v1".to_string(),
-            profile_digest: Some(Digest32 { value: vec![0x20; 32] }),
-            prev_record_digest: Some(Digest32 { value: vec![0x01; 32] }),
-            record_digest: Some(Digest32 { value: vec![0x02; 32] }),
-            vrf_proof: Some(Signature {
-                algorithm: "TEMPORARY_VRF".to_string(),
-                signer: vec![0xAA, 0xBB, 0xCC, 0xDD],
-                signature: vec![0x02, 0x24, 0x46, 0x68, 0x8A],
+        finalization_header: Some(FinalizationHeader {
+            experience_id: 1_002,
+            timestamp_ms: 1_700_010_250,
+            prev_record_digest: Some(Digest32 { value: vec![0xBB; 32] }),
+            record_digest: Some(Digest32 { value: vec![0xCC; 32] }),
+            vrf_digest_ref: Some(Ref {
+                uri: "vrf://digest/seed".to_string(),
+                label: "vrf".to_string(),
             }),
+            proof_receipt_ref: Some(Ref {
+                uri: "proof://receipt/b".to_string(),
+                label: "proof".to_string(),
+            }),
+            charter_version_digest: "charter:v3".to_string(),
+            policy_version_digest: "policy:v5".to_string(),
+            key_epoch_id: 17,
         }),
+        related_refs,
+    };
+
+    let _core_frame = CoreFrame {
+        core_frame_id: "core-action-002".to_string(),
+        session_id: "session-42".to_string(),
+        step_id: "action-2".to_string(),
+        input_packet_refs: vec![Ref {
+            uri: "packet://bridge/030".to_string(),
+            label: "primary".to_string(),
+        }],
+        self_state_ref: Some(Ref {
+            uri: "state://self/42".to_string(),
+            label: "baseline".to_string(),
+        }),
+        intent_refs: vec![Ref {
+            uri: "intent://primary/42".to_string(),
+            label: "primary".to_string(),
+        }],
+        candidate_refs: vec![Ref {
+            uri: "candidate://lm/beta".to_string(),
+            label: "lm-beta".to_string(),
+        }],
+        workspace_mode: WorkMode::WmExecPlan as i32,
+        core_embedding_digest: Some(Digest32 { value: vec![0x02; 32] }),
+        reason_codes: Some(ReasonCodes { codes: sorted_strings(&["action", "execute"]) }),
+    };
+
+    let _metabolic_frame = MetabolicFrame {
+        metabolic_frame_id: "metabolic-action-002".to_string(),
+        profile_state: ProfileState::M2 as i32,
+        control_frame_ref: Some(Ref {
+            uri: "control://frame/18".to_string(),
+            label: "control".to_string(),
+        }),
+        arousal_class: LevelClass::Med as i32,
+        threat_class: LevelClass::Med as i32,
+        stability_class: LevelClass::Med as i32,
+        progress_class: LevelClass::High as i32,
+        noise_class: NoiseClass::Med as i32,
+        priority_class: PriorityClass::High as i32,
+        hpa_baseline_ref: None,
+        reason_codes: Some(ReasonCodes { codes: sorted_strings(&["metabolic-action"]) }),
+    };
+
+    let mut dlp_refs =
+        vec![Ref { uri: "dlp://scan/alpha".to_string(), label: "pre-exec".to_string() }];
+    dlp_refs.sort_by(|a, b| a.uri.cmp(&b.uri));
+    let _governance_frame = GovernanceFrame {
+        governance_frame_id: "governance-action-002".to_string(),
+        policy_decision_refs,
+        grant_refs,
+        dlp_refs,
+        budget_snapshot_ref: Some(Ref {
+            uri: "budget://snap/2024-01".to_string(),
+            label: "budget".to_string(),
+        }),
+        pvgs_receipt_ref: Some(Ref {
+            uri: "pvgs://receipt/alpha".to_string(),
+            label: "pvgs".to_string(),
+        }),
+        reason_codes: Some(ReasonCodes { codes: sorted_strings(&["policy-check", "pvgs-gate"]) }),
     };
 
     verify_roundtrip("experience_rt_action_exec", EXPERIENCE_SCHEMA, expected)
@@ -320,42 +444,107 @@ fn experience_record_rt_action_exec_roundtrip() -> Result<()> {
 
 #[test]
 fn experience_record_rt_output_roundtrip() -> Result<()> {
-    let mut constraints = vec!["output-audited".to_string(), "watermark-applied".to_string()];
-    constraints.sort();
-    let mut reason_codes = vec!["output-ready".to_string()];
-    reason_codes.sort();
+    let related_refs = vec![
+        Ref { uri: "artifact://output/777".to_string(), label: "output_artifact".to_string() },
+        Ref { uri: "dlp://scan/final".to_string(), label: "dlp-scan".to_string() },
+    ];
+
+    let dlp_refs = vec![
+        Ref { uri: "dlp://scan/final".to_string(), label: "dlp-scan".to_string() },
+        Ref { uri: "dlp://audit/summary".to_string(), label: "dlp-audit".to_string() },
+    ];
 
     let expected = ExperienceRecord {
-        record_type: RuntimeRecordType::RtOutput as i32,
-        core: Some(CoreFrame {
-            intent_id: "intent-rt".to_string(),
-            session_id: "session-42".to_string(),
-            step_id: "output-3".to_string(),
-            actor: "renderer".to_string(),
-            description: "deliver output to user".to_string(),
+        record_type: RecordType::RtOutput as i32,
+        core_frame_ref: Some(Ref {
+            uri: "core://output/003".to_string(),
+            label: "core-frame".to_string(),
         }),
-        metabolic: Some(MetabolicFrame {
-            prompt_tokens: 64,
-            completion_tokens: 512,
-            latency_ms: 30,
-            cache_hit: false,
+        metabolic_frame_ref: Some(Ref {
+            uri: "metabolic://output/003".to_string(),
+            label: "metabolic-frame".to_string(),
         }),
-        governance: Some(GovernanceFrame {
-            decision: DecisionForm::Allow as i32,
-            reason_codes: Some(ReasonCodes { codes: reason_codes }),
-            constraints_applied: constraints,
+        governance_frame_ref: Some(Ref {
+            uri: "governance://output/003".to_string(),
+            label: "governance-frame".to_string(),
         }),
-        finalization: Some(FinalizationHeader {
-            epoch_id: 17,
-            charter_digest: "charter:v1".to_string(),
-            profile_digest: Some(Digest32 { value: vec![0x30; 32] }),
-            prev_record_digest: Some(Digest32 { value: vec![0x02; 32] }),
-            record_digest: Some(Digest32 { value: vec![0x03; 32] }),
-            vrf_proof: Some(Signature {
-                algorithm: "TEMPORARY_VRF".to_string(),
-                signer: vec![0xAA, 0xBB, 0xCC, 0xDD],
-                signature: vec![0x03, 0x25, 0x47, 0x69, 0x8B],
+        finalization_header: Some(FinalizationHeader {
+            experience_id: 1_003,
+            timestamp_ms: 1_700_010_500,
+            prev_record_digest: Some(Digest32 { value: vec![0xCC; 32] }),
+            record_digest: Some(Digest32 { value: vec![0xDD; 32] }),
+            vrf_digest_ref: Some(Ref {
+                uri: "vrf://digest/seed".to_string(),
+                label: "vrf".to_string(),
             }),
+            proof_receipt_ref: Some(Ref {
+                uri: "proof://receipt/c".to_string(),
+                label: "proof".to_string(),
+            }),
+            charter_version_digest: "charter:v3".to_string(),
+            policy_version_digest: "policy:v5".to_string(),
+            key_epoch_id: 17,
+        }),
+        related_refs,
+    };
+
+    let _core_frame = CoreFrame {
+        core_frame_id: "core-output-003".to_string(),
+        session_id: "session-42".to_string(),
+        step_id: "output-3".to_string(),
+        input_packet_refs: vec![Ref {
+            uri: "packet://bridge/045".to_string(),
+            label: "primary".to_string(),
+        }],
+        self_state_ref: None,
+        intent_refs: vec![Ref {
+            uri: "intent://primary/42".to_string(),
+            label: "primary".to_string(),
+        }],
+        candidate_refs: vec![Ref {
+            uri: "candidate://lm/gamma".to_string(),
+            label: "lm-gamma".to_string(),
+        }],
+        workspace_mode: WorkMode::WmReport as i32,
+        core_embedding_digest: Some(Digest32 { value: vec![0x03; 32] }),
+        reason_codes: Some(ReasonCodes { codes: sorted_strings(&["output", "ready"]) }),
+    };
+
+    let _metabolic_frame = MetabolicFrame {
+        metabolic_frame_id: "metabolic-output-003".to_string(),
+        profile_state: ProfileState::M2 as i32,
+        control_frame_ref: Some(Ref {
+            uri: "control://frame/19".to_string(),
+            label: "control".to_string(),
+        }),
+        arousal_class: LevelClass::Low as i32,
+        threat_class: LevelClass::Low as i32,
+        stability_class: LevelClass::High as i32,
+        progress_class: LevelClass::High as i32,
+        noise_class: NoiseClass::Low as i32,
+        priority_class: PriorityClass::Med as i32,
+        hpa_baseline_ref: None,
+        reason_codes: Some(ReasonCodes { codes: sorted_strings(&["metabolic-output"]) }),
+    };
+
+    let mut policy_decision_refs =
+        vec![Ref { uri: "policy://decision/003".to_string(), label: "decision".to_string() }];
+    policy_decision_refs.sort_by(|a, b| a.uri.cmp(&b.uri));
+    let mut grant_refs =
+        vec![Ref { uri: "grant://dlp/export".to_string(), label: "export-grant".to_string() }];
+    grant_refs.sort_by(|a, b| a.uri.cmp(&b.uri));
+    let _governance_frame = GovernanceFrame {
+        governance_frame_id: "governance-output-003".to_string(),
+        policy_decision_refs,
+        grant_refs,
+        dlp_refs,
+        budget_snapshot_ref: Some(Ref {
+            uri: "budget://snap/2024-02".to_string(),
+            label: "budget".to_string(),
+        }),
+        pvgs_receipt_ref: None,
+        reason_codes: Some(ReasonCodes {
+            codes: sorted_strings(&["dlp-approved", "output-ready"]),
         }),
     };
 
