@@ -3,34 +3,79 @@ syntax = "proto3";
 package ucf.v1;
 
 import "ucf/v1/common.proto";
+import "ucf/v1/experience.proto";
+import "ucf/v1/milestones.proto";
+import "ucf/v1/pvgs.proto";
+import "ucf/v1/frames.proto";
 
-enum ConsistencyLevel {
-  CONSISTENCY_LEVEL_UNSPECIFIED = 0;
-  CONSISTENCY_LEVEL_LOW = 1;
-  CONSISTENCY_LEVEL_MEDIUM = 2;
-  CONSISTENCY_LEVEL_HIGH = 3;
+enum UncertaintyClass {
+  UNCERTAINTY_CLASS_UNSPECIFIED = 0;
+  UNCERTAINTY_CLASS_LOW = 1;
+  UNCERTAINTY_CLASS_MED = 2;
+  UNCERTAINTY_CLASS_HIGH = 3;
 }
 
-message StateComponent {
-  string name = 1;
-  double value = 2;
-  string unit = 3;
+enum ConsistencyFlag {
+  CONSISTENCY_FLAG_UNSPECIFIED = 0;
+  CONSISTENCY_FLAG_VALUE_CONFLICT = 1;
+  CONSISTENCY_FLAG_BEHAVIOR_DRIFT = 2;
+  CONSISTENCY_FLAG_RISK_DRIFT = 3;
+  CONSISTENCY_FLAG_IDENTITY_BREAK = 4;
+}
+
+enum ConsolidationEligibility {
+  CONSOLIDATION_ELIGIBILITY_UNSPECIFIED = 0;
+  CONSOLIDATION_ELIGIBILITY_ALLOW = 1;
+  CONSOLIDATION_ELIGIBILITY_DENY = 2;
+}
+
+enum RecursionDepthClass {
+  RECURSION_DEPTH_CLASS_UNSPECIFIED = 0;
+  RECURSION_DEPTH_CLASS_DEPTH_LOW = 1;
+  RECURSION_DEPTH_CLASS_DEPTH_MED = 2;
+  RECURSION_DEPTH_CLASS_DEPTH_HIGH = 3;
 }
 
 message SelfStateVector {
-  string self_id = 1;
-  uint64 revision = 2;
-  repeated StateComponent components = 3;
+  string self_state_id = 1;
+  string session_id = 2;
+  string step_id = 3;
+  Digest32 digest = 4;
+  Digest32 summary_features_digest = 5;
+  Ref hormone_snapshot_ref = 6;
+  repeated Ref milestone_context_refs = 7;
+  UncertaintyClass uncertainty_class = 8;
+  WorkMode work_mode = 9;
+}
+
+message RecursionLevel {
+  uint32 level_k = 1;
+  LevelClass weight_class = 2;
+  LevelClass intensity_class = 3;
+  Digest32 level_summary_digest = 4;
 }
 
 message RecursiveSelfState {
-  SelfStateVector current = 1;
-  repeated SelfStateVector ancestry = 2;
-  ConsistencyFeedback feedback = 3;
+  string rss_id = 1;
+  Digest32 rss_digest = 2;
+  Ref base_self_state_ref = 3;
+  RecursionDepthClass depth_class = 4;
+  repeated RecursionLevel levels = 5; // bounded
+  optional Ref vrf_digest_ref = 6;
+  optional Ref proof_receipt_ref = 7;
 }
 
 message ConsistencyFeedback {
-  ConsistencyLevel level = 1;
-  ReasonCodes reason_codes = 2;
-  string summary = 3;
+  string cf_id = 1;
+  Digest32 cf_digest = 2;
+  Ref rss_ref = 3;
+  repeated Ref ism_refs = 4; // bounded macro anchors
+  Ref pev_ref = 5;
+  ConsistencyClass consistency_class = 6;
+  repeated ConsistencyFlag flags = 7; // bounded
+  NoiseClass recommended_noise_class = 8;
+  ConsolidationEligibility consolidation_eligibility = 9;
+  bool replay_trigger_hint = 10;
+  ReasonCodes trigger_reason_codes = 11;
+  optional Ref proof_receipt_ref = 12;
 }

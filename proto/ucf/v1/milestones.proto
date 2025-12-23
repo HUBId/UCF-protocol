@@ -3,31 +3,120 @@ syntax = "proto3";
 package ucf.v1;
 
 import "ucf/v1/common.proto";
+import "ucf/v1/experience.proto";
+import "ucf/v1/pvgs.proto";
+import "ucf/v1/frames.proto";
+
+enum MilestoneState {
+  MILESTONE_STATE_UNSPECIFIED = 0;
+  MILESTONE_STATE_OPEN = 1;
+  MILESTONE_STATE_SEALED = 2;
+  MILESTONE_STATE_STABLE = 3;
+  MILESTONE_STATE_FINALIZED = 4;
+  MILESTONE_STATE_REJECTED = 5;
+}
+
+enum ReplayFidelity {
+  REPLAY_FIDELITY_UNSPECIFIED = 0;
+  REPLAY_FIDELITY_REPLAY_LOW = 1;
+  REPLAY_FIDELITY_REPLAY_MED = 2;
+  REPLAY_FIDELITY_REPLAY_HIGH = 3;
+}
+
+enum ReplayInjectMode {
+  REPLAY_INJECT_MODE_UNSPECIFIED = 0;
+  REPLAY_INJECT_MODE_INJECT_DMN_SIMULATE = 1;
+  REPLAY_INJECT_MODE_INJECT_CEN_EXEC_PLAN = 2;
+  REPLAY_INJECT_MODE_INJECT_REPORT_ONLY = 3;
+}
+
+enum ConsistencyClass {
+  CONSISTENCY_CLASS_UNSPECIFIED = 0;
+  CONSISTENCY_CLASS_CONSISTENCY_LOW = 1;
+  CONSISTENCY_CLASS_CONSISTENCY_MED = 2;
+  CONSISTENCY_CLASS_CONSISTENCY_HIGH = 3;
+}
+
+message ExperienceRange {
+  uint64 start_experience_id = 1;
+  uint64 end_experience_id = 2;
+  Digest32 head_record_digest = 3;
+}
+
+message HormoneProfileSummary {
+  LevelClass arousal = 1;
+  LevelClass threat = 2;
+  LevelClass stability = 3;
+  LevelClass progress = 4;
+  optional LevelClass allostatic_load = 5;
+}
 
 message MicroMilestone {
-  string id = 1;
-  string objective = 2;
-  repeated string deliverables = 3;
-  string owner = 4;
+  string micro_id = 1;
+  Digest32 micro_digest = 2;
+  MilestoneState state = 3;
+  ExperienceRange experience_range = 4;
+  Digest32 summary_digest = 5;
+  HormoneProfileSummary hormone_profile = 6;
+  PriorityClass priority_class = 7;
+  optional Ref vrf_digest_ref = 8;
+  optional Ref proof_receipt_ref = 9;
+  repeated string theme_tags = 10; // bounded
+  optional ReasonCodes reason_codes = 11;
 }
 
 message MesoMilestone {
-  string id = 1;
-  string objective = 2;
-  repeated MicroMilestone micro_milestones = 3;
-  string steward = 4;
+  string meso_id = 1;
+  Digest32 meso_digest = 2;
+  MilestoneState state = 3;
+  repeated Ref micro_refs = 4; // bounded
+  repeated string theme_tags = 5; // bounded
+  HormoneProfileSummary hormone_profile = 6;
+  LevelClass stability_class = 7;
+  optional Ref vrf_digest_ref = 8;
+  optional Ref proof_receipt_ref = 9;
+}
+
+enum TraitDirection {
+  TRAIT_DIRECTION_UNSPECIFIED = 0;
+  TRAIT_DIRECTION_INCREASE_STRICTNESS = 1;
+  TRAIT_DIRECTION_DECREASE_STRICTNESS = 2;
+}
+
+message TraitUpdate {
+  string trait_name = 1;
+  TraitDirection direction = 2;
+  LevelClass magnitude_class = 3;
+  repeated Ref justification_refs = 4; // bounded
 }
 
 message MacroMilestone {
-  string id = 1;
-  string objective = 2;
-  repeated MesoMilestone meso_milestones = 3;
-  string sponsor = 4;
+  string macro_id = 1;
+  Digest32 macro_digest = 2;
+  MilestoneState state = 3;
+  repeated Ref meso_refs = 4;
+  repeated TraitUpdate trait_updates = 5; // bounded
+  bool identity_anchor_flag = 6;
+  ConsistencyClass consistency_class = 7;
+  optional Ref vrf_digest_ref = 8;
+  optional Ref proof_receipt_ref = 9;
+  optional Ref policy_ecology_ref = 10;
 }
 
 message ReplayPlan {
-  string plan_id = 1;
-  string trigger = 2;
-  ReasonCodes reason_codes = 3;
-  repeated string actions = 4;
+  string replay_id = 1;
+  Digest32 replay_digest = 2;
+  ReasonCodes trigger_reason_codes = 3;
+  repeated Ref target_refs = 4; // bounded
+  ReplayFidelity fidelity = 5;
+  ReplayInjectMode inject_mode = 6;
+  StopConditions stop_conditions = 7;
+  optional Ref vrf_digest_ref = 8;
+  optional Ref proof_receipt_ref = 9;
+
+  message StopConditions {
+    uint32 max_steps_class = 1; // bucketed
+    uint32 max_budget_class = 2; // bucketed
+    bool stop_on_dlp_flag = 3;
+  }
 }
