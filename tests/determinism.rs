@@ -15,6 +15,8 @@ const PVGS_SCHEMA: &str = "ucf.v1.PVGSReceipt";
 const SIGNAL_FRAME_SCHEMA: &str = "ucf.v1.SignalFrame";
 const CONTROL_FRAME_SCHEMA: &str = "ucf.v1.ControlFrame";
 const EXPERIENCE_SCHEMA: &str = "ucf.v1.ExperienceRecord";
+const MICRO_MILESTONE_SCHEMA: &str = "ucf.v1.MicroMilestone";
+const MESO_MILESTONE_SCHEMA: &str = "ucf.v1.MesoMilestone";
 const MACRO_MILESTONE_SCHEMA: &str = "ucf.v1.MacroMilestone";
 const REPLAY_PLAN_SCHEMA: &str = "ucf.v1.ReplayPlan";
 const CONSISTENCY_FEEDBACK_SCHEMA: &str = "ucf.v1.ConsistencyFeedback";
@@ -552,75 +554,198 @@ fn experience_record_rt_output_roundtrip() -> Result<()> {
 }
 
 #[test]
-fn macro_milestone_chain_roundtrip() -> Result<()> {
-    let expected = MacroMilestone {
-        id: "macro-frontier".to_string(),
-        objective: "Expand frontier safely".to_string(),
-        meso_milestones: vec![MesoMilestone {
-            id: "meso-staging".to_string(),
-            objective: "Stage corridor expansion".to_string(),
-            micro_milestones: vec![
-                MicroMilestone {
-                    id: "micro-calibrate".to_string(),
-                    objective: "Calibrate edge sensors".to_string(),
-                    deliverables: vec!["calibration-report".to_string(), "sensor-map".to_string()],
-                    owner: "scout".to_string(),
-                },
-                MicroMilestone {
-                    id: "micro-scout".to_string(),
-                    objective: "Scout safe corridor".to_string(),
-                    deliverables: vec!["intel-brief".to_string(), "route-plan".to_string()],
-                    owner: "scout".to_string(),
-                },
-            ],
-            steward: "orchestrator".to_string(),
-        }],
-        sponsor: "mission-control".to_string(),
+fn micro_milestone_sealed_roundtrip() -> Result<()> {
+    let mut theme_tags = vec!["alignment".to_string(), "staging".to_string()];
+    theme_tags.sort();
+    let mut reason_codes = vec!["checkpoint".to_string(), "sealed".to_string()];
+    reason_codes.sort();
+
+    let expected = MicroMilestone {
+        micro_id: "micro-001".to_string(),
+        micro_digest: Some(Digest32 { value: vec![0x11; 32] }),
+        state: MilestoneState::Sealed as i32,
+        experience_range: Some(ExperienceRange {
+            start_experience_id: 1_000,
+            end_experience_id: 1_024,
+            head_record_digest: Some(Digest32 { value: vec![0xAA; 32] }),
+        }),
+        summary_digest: Some(Digest32 { value: vec![0xBB; 32] }),
+        hormone_profile: Some(HormoneProfileSummary {
+            arousal: LevelClass::Low as i32,
+            threat: LevelClass::Med as i32,
+            stability: LevelClass::High as i32,
+            progress: LevelClass::Med as i32,
+            allostatic_load: Some(LevelClass::Low as i32),
+        }),
+        priority_class: PriorityClass::High as i32,
+        vrf_digest_ref: Some(Ref { uri: "vrf://micro/seed".to_string(), label: "vrf".to_string() }),
+        proof_receipt_ref: Some(Ref {
+            uri: "proof://micro/receipt".to_string(),
+            label: "proof".to_string(),
+        }),
+        theme_tags,
+        reason_codes: Some(ReasonCodes { codes: reason_codes }),
     };
 
-    verify_roundtrip("macro_milestone_chain", MACRO_MILESTONE_SCHEMA, expected)
+    verify_roundtrip("micro_milestone_sealed", MICRO_MILESTONE_SCHEMA, expected)
 }
 
 #[test]
-fn replay_plan_triggered_roundtrip() -> Result<()> {
-    let mut actions = vec!["recompute-digest".to_string(), "replay-signature".to_string()];
-    actions.sort();
-    let mut reason_codes = vec!["epoch-mismatch".to_string(), "vrf-replay".to_string()];
-    reason_codes.sort();
+fn meso_milestone_stable_roundtrip() -> Result<()> {
+    let mut theme_tags = vec!["consolidation".to_string(), "stability".to_string()];
+    theme_tags.sort();
+    let mut micro_refs = vec![
+        Ref { uri: "ucf://micro/001".to_string(), label: "micro-a".to_string() },
+        Ref { uri: "ucf://micro/002".to_string(), label: "micro-b".to_string() },
+    ];
+    micro_refs.sort_by(|a, b| a.uri.cmp(&b.uri));
+
+    let expected = MesoMilestone {
+        meso_id: "meso-bridge".to_string(),
+        meso_digest: Some(Digest32 { value: vec![0x22; 32] }),
+        state: MilestoneState::Stable as i32,
+        micro_refs,
+        theme_tags,
+        hormone_profile: Some(HormoneProfileSummary {
+            arousal: LevelClass::Med as i32,
+            threat: LevelClass::Low as i32,
+            stability: LevelClass::High as i32,
+            progress: LevelClass::High as i32,
+            allostatic_load: Some(LevelClass::Med as i32),
+        }),
+        stability_class: LevelClass::High as i32,
+        vrf_digest_ref: None,
+        proof_receipt_ref: Some(Ref {
+            uri: "proof://meso/receipt".to_string(),
+            label: "proof".to_string(),
+        }),
+    };
+
+    verify_roundtrip("meso_milestone_stable", MESO_MILESTONE_SCHEMA, expected)
+}
+
+#[test]
+fn macro_milestone_finalized_roundtrip() -> Result<()> {
+    let mut meso_refs =
+        vec![Ref { uri: "ucf://meso/bridge".to_string(), label: "meso-bridge".to_string() }];
+    meso_refs.sort_by(|a, b| a.uri.cmp(&b.uri));
+
+    let mut justification_refs = vec![
+        Ref { uri: "just://policy/alpha".to_string(), label: "policy".to_string() },
+        Ref { uri: "just://audit/2024".to_string(), label: "audit".to_string() },
+    ];
+    justification_refs.sort_by(|a, b| a.uri.cmp(&b.uri));
+
+    let trait_updates = vec![
+        TraitUpdate {
+            trait_name: "novelty-threshold".to_string(),
+            direction: TraitDirection::IncreaseStrictness as i32,
+            magnitude_class: LevelClass::High as i32,
+            justification_refs: justification_refs.clone(),
+        },
+        TraitUpdate {
+            trait_name: "export-guardrails".to_string(),
+            direction: TraitDirection::IncreaseStrictness as i32,
+            magnitude_class: LevelClass::Med as i32,
+            justification_refs,
+        },
+    ];
+
+    let expected = MacroMilestone {
+        macro_id: "macro-root".to_string(),
+        macro_digest: Some(Digest32 { value: vec![0x33; 32] }),
+        state: MilestoneState::Finalized as i32,
+        meso_refs,
+        trait_updates,
+        identity_anchor_flag: true,
+        consistency_class: ConsistencyClass::ConsistencyHigh as i32,
+        vrf_digest_ref: Some(Ref { uri: "vrf://macro/seed".to_string(), label: "vrf".to_string() }),
+        proof_receipt_ref: Some(Ref {
+            uri: "proof://macro/receipt".to_string(),
+            label: "proof".to_string(),
+        }),
+        policy_ecology_ref: Some(Ref {
+            uri: "pev://digest/v1".to_string(),
+            label: "policy-ecology".to_string(),
+        }),
+    };
+
+    verify_roundtrip("macro_milestone_finalized", MACRO_MILESTONE_SCHEMA, expected)
+}
+
+#[test]
+fn replay_plan_high_fidelity_roundtrip() -> Result<()> {
+    let mut target_refs = vec![
+        Ref { uri: "ucf://macro/root".to_string(), label: "macro-root".to_string() },
+        Ref { uri: "ucf://meso/bridge".to_string(), label: "meso-bridge".to_string() },
+    ];
+    target_refs.sort_by(|a, b| a.uri.cmp(&b.uri));
+
+    let mut trigger_reason_codes =
+        vec!["consistency-low".to_string(), "operator-trigger".to_string()];
+    trigger_reason_codes.sort();
 
     let expected = ReplayPlan {
-        plan_id: "replay-epoch-17".to_string(),
-        trigger: "finalization-drift".to_string(),
-        reason_codes: Some(ReasonCodes { codes: reason_codes }),
-        actions,
+        replay_id: "replay-stability-check".to_string(),
+        replay_digest: Some(Digest32 { value: vec![0x44; 32] }),
+        trigger_reason_codes: Some(ReasonCodes { codes: trigger_reason_codes }),
+        target_refs,
+        fidelity: ReplayFidelity::ReplayHigh as i32,
+        inject_mode: ReplayInjectMode::InjectCenExecPlan as i32,
+        stop_conditions: Some(replay_plan::StopConditions {
+            max_steps_class: 4,
+            max_budget_class: 2,
+            stop_on_dlp_flag: true,
+        }),
+        vrf_digest_ref: Some(Ref {
+            uri: "vrf://replay/seed".to_string(),
+            label: "vrf".to_string(),
+        }),
+        proof_receipt_ref: None,
     };
 
-    verify_roundtrip("replay_plan_triggered", REPLAY_PLAN_SCHEMA, expected)
+    verify_roundtrip("replay_plan_high_fidelity", REPLAY_PLAN_SCHEMA, expected)
 }
 
 #[test]
-fn consistency_feedback_low_roundtrip() -> Result<()> {
-    let expected = ConsistencyFeedback {
-        level: ConsistencyLevel::Low as i32,
-        reason_codes: Some(ReasonCodes { codes: vec!["state-divergence".to_string()] }),
-        summary: "Observed drift from baseline state".to_string(),
-    };
+fn consistency_feedback_low_flags_roundtrip() -> Result<()> {
+    let mut ism_refs = vec![
+        Ref { uri: "ucf://macro/root".to_string(), label: "macro-anchor".to_string() },
+        Ref { uri: "ucf://ism/123".to_string(), label: "ism".to_string() },
+    ];
+    ism_refs.sort_by(|a, b| a.uri.cmp(&b.uri));
 
-    verify_roundtrip("consistency_feedback_low", CONSISTENCY_FEEDBACK_SCHEMA, expected)
-}
+    let mut trigger_reason_codes =
+        vec!["drift-detected".to_string(), "replay-recommended".to_string()];
+    trigger_reason_codes.sort();
 
-#[test]
-fn consistency_feedback_high_roundtrip() -> Result<()> {
-    let mut reason_codes = vec!["multi-hop-consistency".to_string(), "self-check".to_string()];
-    reason_codes.sort();
+    let flags = vec![ConsistencyFlag::BehaviorDrift as i32, ConsistencyFlag::RiskDrift as i32];
 
     let expected = ConsistencyFeedback {
-        level: ConsistencyLevel::High as i32,
-        reason_codes: Some(ReasonCodes { codes: reason_codes }),
-        summary: "High alignment across recursive states".to_string(),
+        cf_id: "cf-low-001".to_string(),
+        cf_digest: Some(Digest32 { value: vec![0x55; 32] }),
+        rss_ref: Some(Ref {
+            uri: "rss://baseline/1".to_string(),
+            label: "baseline-rss".to_string(),
+        }),
+        ism_refs,
+        pev_ref: Some(Ref {
+            uri: "pev://digest/v2".to_string(),
+            label: "policy-ecology".to_string(),
+        }),
+        consistency_class: ConsistencyClass::ConsistencyLow as i32,
+        flags,
+        recommended_noise_class: NoiseClass::Med as i32,
+        consolidation_eligibility: ConsolidationEligibility::Allow as i32,
+        replay_trigger_hint: true,
+        trigger_reason_codes: Some(ReasonCodes { codes: trigger_reason_codes }),
+        proof_receipt_ref: Some(Ref {
+            uri: "proof://consistency/receipt".to_string(),
+            label: "proof".to_string(),
+        }),
     };
 
-    verify_roundtrip("consistency_feedback_high", CONSISTENCY_FEEDBACK_SCHEMA, expected)
+    verify_roundtrip("consistency_feedback_low_flags", CONSISTENCY_FEEDBACK_SCHEMA, expected)
 }
 
 #[test]

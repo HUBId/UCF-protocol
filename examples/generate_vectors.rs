@@ -1,15 +1,20 @@
 use std::fs;
 use std::path::Path;
 
+use prost::Message;
 use ucf_protocol::ucf::v1::canonical_intent::Params as CanonicalIntentParams;
+use ucf_protocol::ucf::v1::replay_plan::StopConditions;
 use ucf_protocol::ucf::v1::*;
 use ucf_protocol::{canonical_bytes, digest32};
 
-fn ensure_sorted(values: &mut [String]) {
+fn sorted_strings(items: &[&str]) -> Vec<String> {
+    let mut values: Vec<String> = items.iter().map(|item| item.to_string()).collect();
     values.sort();
+    values
 }
 
-fn write_fixture(name: &str, bytes: &[u8], digest: [u8; 32]) -> anyhow::Result<()> {
+fn write_fixture(name: &str, schema: &str, bytes: &[u8], domain: &str) -> anyhow::Result<()> {
+    let digest = digest32(domain, schema, "1", bytes);
     let hex_path = Path::new("testvectors").join(format!("{name}.hex"));
     let digest_path = Path::new("testvectors").join(format!("{name}.digest"));
     let mut hex_body = hex::encode(bytes);
@@ -21,66 +26,19 @@ fn write_fixture(name: &str, bytes: &[u8], digest: [u8; 32]) -> anyhow::Result<(
     Ok(())
 }
 
+fn emit_fixture<M: Message>(
+    name: &str,
+    schema: &str,
+    message: &M,
+    domain: &str,
+) -> anyhow::Result<()> {
+    let bytes = canonical_bytes(message);
+    write_fixture(name, schema, &bytes, domain)
+}
+
 fn main() -> anyhow::Result<()> {
     fs::create_dir_all("testvectors")?;
-
     let domain = "ucf-core";
-
-    let mut macro_actions = vec!["recompute-digest".to_string(), "replay-signature".to_string()];
-    ensure_sorted(&mut macro_actions);
-    let mut replay_reason_codes = vec!["epoch-mismatch".to_string(), "vrf-replay".to_string()];
-    ensure_sorted(&mut replay_reason_codes);
-
-    let micro_align = MicroMilestone {
-        id: "micro-calibrate".to_string(),
-        objective: "Calibrate edge sensors".to_string(),
-        deliverables: vec!["calibration-report".to_string(), "sensor-map".to_string()],
-        owner: "scout".to_string(),
-    };
-    let micro_scout = MicroMilestone {
-        id: "micro-scout".to_string(),
-        objective: "Scout safe corridor".to_string(),
-        deliverables: vec!["intel-brief".to_string(), "route-plan".to_string()],
-        owner: "scout".to_string(),
-    };
-    let meso_path = MesoMilestone {
-        id: "meso-staging".to_string(),
-        objective: "Stage corridor expansion".to_string(),
-        micro_milestones: vec![micro_align.clone(), micro_scout.clone()],
-        steward: "orchestrator".to_string(),
-    };
-    let macro_frontier = MacroMilestone {
-        id: "macro-frontier".to_string(),
-        objective: "Expand frontier safely".to_string(),
-        meso_milestones: vec![meso_path.clone()],
-        sponsor: "mission-control".to_string(),
-    };
-
-    let replay_plan = ReplayPlan {
-        plan_id: "replay-epoch-17".to_string(),
-        trigger: "finalization-drift".to_string(),
-        reason_codes: Some(ReasonCodes { codes: replay_reason_codes }),
-        actions: macro_actions,
-    };
-
-    let consistency_feedback_low = ConsistencyFeedback {
-        level: ConsistencyLevel::Low as i32,
-        reason_codes: Some(ReasonCodes { codes: vec!["state-divergence".to_string()] }),
-        summary: "Observed drift from baseline state".to_string(),
-    };
-
-    let mut high_reasons = vec!["multi-hop-consistency".to_string(), "self-check".to_string()];
-    ensure_sorted(&mut high_reasons);
-    let consistency_feedback_high = ConsistencyFeedback {
-        level: ConsistencyLevel::High as i32,
-        reason_codes: Some(ReasonCodes { codes: high_reasons }),
-        summary: "High alignment across recursive states".to_string(),
-    };
-
-    let mut query_selectors = vec!["foo".to_string(), "bar".to_string()];
-    ensure_sorted(&mut query_selectors);
-    let mut ci_reason_codes = vec!["baseline".to_string(), "query".to_string()];
-    ensure_sorted(&mut ci_reason_codes);
 
     let canonical_intent = CanonicalIntent {
         intent_id: "intent-123".to_string(),
@@ -88,33 +46,23 @@ fn main() -> anyhow::Result<()> {
         risk_level: RiskLevel::Low as i32,
         data_class: DataClass::Public as i32,
         subject: Some(Ref { uri: "did:example:subject".to_string(), label: "primary".to_string() }),
-        reason_codes: Some(ReasonCodes { codes: ci_reason_codes }),
+        reason_codes: Some(ReasonCodes { codes: sorted_strings(&["baseline", "query"]) }),
         params: Some(CanonicalIntentParams::Query(QueryParams {
             query: "select * from controls".to_string(),
-            selectors: query_selectors,
+            selectors: sorted_strings(&["foo", "bar"]),
         })),
     };
 
-    let ci_bytes = canonical_bytes(&canonical_intent);
-    let ci_digest = digest32(domain, "ucf.v1.CanonicalIntent", "1", &ci_bytes);
-    write_fixture("canonical_intent_query", &ci_bytes, ci_digest)?;
-
-    let mut pd_reason_codes = vec!["missing-proof".to_string(), "scope-limited".to_string()];
-    ensure_sorted(&mut pd_reason_codes);
-    let mut constraints_added = vec!["mfa-required".to_string(), "geo-fence".to_string()];
-    ensure_sorted(&mut constraints_added);
-    let mut constraints_removed = vec!["legacy-exception".to_string()];
-    ensure_sorted(&mut constraints_removed);
-
     let policy_decision = PolicyDecision {
         decision: DecisionForm::RequireApproval as i32,
-        reason_codes: Some(ReasonCodes { codes: pd_reason_codes }),
-        constraints: Some(ConstraintsDelta { constraints_added, constraints_removed }),
+        reason_codes: Some(ReasonCodes {
+            codes: sorted_strings(&["missing-proof", "scope-limited"]),
+        }),
+        constraints: Some(ConstraintsDelta {
+            constraints_added: sorted_strings(&["mfa-required", "geo-fence"]),
+            constraints_removed: sorted_strings(&["legacy-exception"]),
+        }),
     };
-
-    let pd_bytes = canonical_bytes(&policy_decision);
-    let pd_digest = digest32(domain, "ucf.v1.PolicyDecision", "1", &pd_bytes);
-    write_fixture("policy_decision", &pd_bytes, pd_digest)?;
 
     let pvgs_receipt = PvgsReceipt {
         status: ReceiptStatus::Accepted as i32,
@@ -127,9 +75,109 @@ fn main() -> anyhow::Result<()> {
         }),
     };
 
-    let pvgs_bytes = canonical_bytes(&pvgs_receipt);
-    let pvgs_digest = digest32(domain, "ucf.v1.PVGSReceipt", "1", &pvgs_bytes);
-    write_fixture("pvgs_receipt", &pvgs_bytes, pvgs_digest)?;
+    let signal_frame = SignalFrame {
+        signal_frame_id: "sig-short-001".to_string(),
+        signal_frame_digest: Some(Digest32 { value: vec![0x11; 32] }),
+        epoch_id: 42,
+        timestamp_ms: 1_700_000_500,
+        window: Some(WindowRef {
+            window_id: "window-short-1".to_string(),
+            window_kind: WindowKind::Short as i32,
+            epoch_id: 42,
+            digest: Some(Digest32 { value: vec![0xAA; 32] }),
+        }),
+        integrity_state: IntegrityState::Ok as i32,
+        policy_stats: Some(PolicyStats {
+            deny_count: 3,
+            allow_count: 7,
+            require_approval_count: 2,
+            require_simulation_count: 1,
+            top_reason_codes: Some(TopReasonCodes {
+                reason_codes: Some(ReasonCodes {
+                    codes: sorted_strings(&["deny", "require-approval"]),
+                }),
+            }),
+        }),
+        dlp_stats: Some(DlpStats {
+            dlp_block_count: 2,
+            dlp_redact_count: 1,
+            classify_upgrade_count: 1,
+            top_reason_codes: Some(TopReasonCodes {
+                reason_codes: Some(ReasonCodes {
+                    codes: sorted_strings(&["dlp-block", "dlp-redact"]),
+                }),
+            }),
+        }),
+        exec_stats: Some(ExecStats {
+            timeout_count: 1,
+            partial_failure_count: 1,
+            tool_unavailable_count: 2,
+            top_reason_codes: Some(TopReasonCodes {
+                reason_codes: Some(ReasonCodes {
+                    codes: sorted_strings(&["executor-timeout", "tool-unavailable"]),
+                }),
+            }),
+        }),
+        budget_stats: Some(BudgetStats {
+            near_exhaustion_count: 1,
+            chain_limit_hits: 1,
+            concurrency_limit_hits: 0,
+            top_reason_codes: Some(TopReasonCodes {
+                reason_codes: Some(ReasonCodes {
+                    codes: sorted_strings(&["chain-limit", "near-exhaustion"]),
+                }),
+            }),
+        }),
+        human_stats: Some(HumanStats {
+            approval_denied_count: 1,
+            stop_invoked_flag: false,
+            recovery_stage: "pilot".to_string(),
+        }),
+        receipt_stats: Some(ReceiptStats {
+            receipt_missing_count: 1,
+            receipt_invalid_count: 1,
+            top_reason_codes: Some(TopReasonCodes {
+                reason_codes: Some(ReasonCodes {
+                    codes: sorted_strings(&["missing", "signature-invalid"]),
+                }),
+            }),
+        }),
+        reason_codes: Some(ReasonCodes {
+            codes: sorted_strings(&["budget-tight", "policy-deny", "receipt-missing"]),
+        }),
+    };
+
+    let control_frame = ControlFrame {
+        control_frame_id: "ctrl-m1-001".to_string(),
+        control_frame_digest: Some(Digest32 { value: vec![0x22; 32] }),
+        epoch_id: 42,
+        timestamp_ms: 1_700_000_750,
+        active_profile: ProfileState::M1 as i32,
+        profile_reason_codes: Some(ReasonCodes { codes: sorted_strings(&["ml-ops", "safety"]) }),
+        overlays: Some(OverlaySet {
+            ovl_simulate_first: true,
+            ovl_export_lock: true,
+            ovl_novelty_lock: true,
+        }),
+        threshold_modifiers: Some(ThresholdModifiers {
+            approval_mode: ApprovalMode::Strict as i32,
+            novelty_tightening: LevelClass::High as i32,
+            chain_tightening: LevelClass::Med as i32,
+            export_strictness_tightening: LevelClass::Med as i32,
+            cooldown_class: CooldownClass::Longer as i32,
+        }),
+        toolclass_mask: Some(ToolClassMask {
+            enable_read: true,
+            enable_transform: true,
+            enable_export: false,
+            enable_write: false,
+            enable_execute: false,
+        }),
+        deescalation_lock: true,
+        charter_version_digest: "charter:v2".to_string(),
+        character_epoch_digest: Some(Digest32 { value: vec![0x33; 32] }),
+        prev_control_frame_digest: Some(Digest32 { value: vec![0x44; 32] }),
+    };
 
     let experience_rt_perception = ExperienceRecord {
         record_type: RecordType::RtPerception as i32,
@@ -237,35 +285,169 @@ fn main() -> anyhow::Result<()> {
         ],
     };
 
-    for (name, record) in [
-        ("experience_rt_perception", experience_rt_perception),
-        ("experience_rt_action_exec", experience_rt_action_exec),
-        ("experience_rt_output", experience_rt_output),
-    ] {
-        let bytes = canonical_bytes(&record);
-        let digest = digest32(domain, "ucf.v1.ExperienceRecord", "1", &bytes);
-        write_fixture(name, &bytes, digest)?;
-    }
+    let micro_milestone = MicroMilestone {
+        micro_id: "micro-001".to_string(),
+        micro_digest: Some(Digest32 { value: vec![0x11; 32] }),
+        state: MilestoneState::Sealed as i32,
+        experience_range: Some(ExperienceRange {
+            start_experience_id: 1_000,
+            end_experience_id: 1_024,
+            head_record_digest: Some(Digest32 { value: vec![0xAA; 32] }),
+        }),
+        summary_digest: Some(Digest32 { value: vec![0xBB; 32] }),
+        hormone_profile: Some(HormoneProfileSummary {
+            arousal: LevelClass::Low as i32,
+            threat: LevelClass::Med as i32,
+            stability: LevelClass::High as i32,
+            progress: LevelClass::Med as i32,
+            allostatic_load: Some(LevelClass::Low as i32),
+        }),
+        priority_class: PriorityClass::High as i32,
+        vrf_digest_ref: Some(Ref { uri: "vrf://micro/seed".to_string(), label: "vrf".to_string() }),
+        proof_receipt_ref: Some(Ref {
+            uri: "proof://micro/receipt".to_string(),
+            label: "proof".to_string(),
+        }),
+        theme_tags: sorted_strings(&["alignment", "staging"]),
+        reason_codes: Some(ReasonCodes { codes: sorted_strings(&["checkpoint", "sealed"]) }),
+    };
 
-    let macro_bytes = canonical_bytes(&macro_frontier);
-    let macro_digest = digest32(domain, "ucf.v1.MacroMilestone", "1", &macro_bytes);
-    write_fixture("macro_milestone_chain", &macro_bytes, macro_digest)?;
+    let meso_milestone = MesoMilestone {
+        meso_id: "meso-bridge".to_string(),
+        meso_digest: Some(Digest32 { value: vec![0x22; 32] }),
+        state: MilestoneState::Stable as i32,
+        micro_refs: {
+            let mut refs = vec![
+                Ref { uri: "ucf://micro/001".to_string(), label: "micro-a".to_string() },
+                Ref { uri: "ucf://micro/002".to_string(), label: "micro-b".to_string() },
+            ];
+            refs.sort_by(|a, b| a.uri.cmp(&b.uri));
+            refs
+        },
+        theme_tags: sorted_strings(&["consolidation", "stability"]),
+        hormone_profile: Some(HormoneProfileSummary {
+            arousal: LevelClass::Med as i32,
+            threat: LevelClass::Low as i32,
+            stability: LevelClass::High as i32,
+            progress: LevelClass::High as i32,
+            allostatic_load: Some(LevelClass::Med as i32),
+        }),
+        stability_class: LevelClass::High as i32,
+        vrf_digest_ref: None,
+        proof_receipt_ref: Some(Ref {
+            uri: "proof://meso/receipt".to_string(),
+            label: "proof".to_string(),
+        }),
+    };
 
-    let replay_bytes = canonical_bytes(&replay_plan);
-    let replay_digest = digest32(domain, "ucf.v1.ReplayPlan", "1", &replay_bytes);
-    write_fixture("replay_plan_triggered", &replay_bytes, replay_digest)?;
+    let macro_milestone = MacroMilestone {
+        macro_id: "macro-root".to_string(),
+        macro_digest: Some(Digest32 { value: vec![0x33; 32] }),
+        state: MilestoneState::Finalized as i32,
+        meso_refs: {
+            let mut refs = vec![Ref {
+                uri: "ucf://meso/bridge".to_string(),
+                label: "meso-bridge".to_string(),
+            }];
+            refs.sort_by(|a, b| a.uri.cmp(&b.uri));
+            refs
+        },
+        trait_updates: {
+            let mut justification_refs = vec![
+                Ref { uri: "just://audit/2024".to_string(), label: "audit".to_string() },
+                Ref { uri: "just://policy/alpha".to_string(), label: "policy".to_string() },
+            ];
+            justification_refs.sort_by(|a, b| a.uri.cmp(&b.uri));
+            vec![
+                TraitUpdate {
+                    trait_name: "novelty-threshold".to_string(),
+                    direction: TraitDirection::IncreaseStrictness as i32,
+                    magnitude_class: LevelClass::High as i32,
+                    justification_refs: justification_refs.clone(),
+                },
+                TraitUpdate {
+                    trait_name: "export-guardrails".to_string(),
+                    direction: TraitDirection::IncreaseStrictness as i32,
+                    magnitude_class: LevelClass::Med as i32,
+                    justification_refs,
+                },
+            ]
+        },
+        identity_anchor_flag: true,
+        consistency_class: ConsistencyClass::ConsistencyHigh as i32,
+        vrf_digest_ref: Some(Ref { uri: "vrf://macro/seed".to_string(), label: "vrf".to_string() }),
+        proof_receipt_ref: Some(Ref {
+            uri: "proof://macro/receipt".to_string(),
+            label: "proof".to_string(),
+        }),
+        policy_ecology_ref: Some(Ref {
+            uri: "pev://digest/v1".to_string(),
+            label: "policy-ecology".to_string(),
+        }),
+    };
 
-    for (name, feedback) in [
-        ("consistency_feedback_low", consistency_feedback_low),
-        ("consistency_feedback_high", consistency_feedback_high),
-    ] {
-        let bytes = canonical_bytes(&feedback);
-        let digest = digest32(domain, "ucf.v1.ConsistencyFeedback", "1", &bytes);
-        write_fixture(name, &bytes, digest)?;
-    }
+    let replay_plan = ReplayPlan {
+        replay_id: "replay-stability-check".to_string(),
+        replay_digest: Some(Digest32 { value: vec![0x44; 32] }),
+        trigger_reason_codes: Some(ReasonCodes {
+            codes: sorted_strings(&["consistency-low", "operator-trigger"]),
+        }),
+        target_refs: {
+            let mut refs = vec![
+                Ref { uri: "ucf://macro/root".to_string(), label: "macro-root".to_string() },
+                Ref { uri: "ucf://meso/bridge".to_string(), label: "meso-bridge".to_string() },
+            ];
+            refs.sort_by(|a, b| a.uri.cmp(&b.uri));
+            refs
+        },
+        fidelity: ReplayFidelity::ReplayHigh as i32,
+        inject_mode: ReplayInjectMode::InjectCenExecPlan as i32,
+        stop_conditions: Some(StopConditions {
+            max_steps_class: 4,
+            max_budget_class: 2,
+            stop_on_dlp_flag: true,
+        }),
+        vrf_digest_ref: Some(Ref {
+            uri: "vrf://replay/seed".to_string(),
+            label: "vrf".to_string(),
+        }),
+        proof_receipt_ref: None,
+    };
 
-    let mut classify_inputs = vec!["text/plain".to_string(), "image/png".to_string()];
-    ensure_sorted(&mut classify_inputs);
+    let consistency_feedback = ConsistencyFeedback {
+        cf_id: "cf-low-001".to_string(),
+        cf_digest: Some(Digest32 { value: vec![0x55; 32] }),
+        rss_ref: Some(Ref {
+            uri: "rss://baseline/1".to_string(),
+            label: "baseline-rss".to_string(),
+        }),
+        ism_refs: {
+            let mut refs = vec![
+                Ref { uri: "ucf://macro/root".to_string(), label: "macro-anchor".to_string() },
+                Ref { uri: "ucf://ism/123".to_string(), label: "ism".to_string() },
+            ];
+            refs.sort_by(|a, b| a.uri.cmp(&b.uri));
+            refs
+        },
+        pev_ref: Some(Ref {
+            uri: "pev://digest/v2".to_string(),
+            label: "policy-ecology".to_string(),
+        }),
+        consistency_class: ConsistencyClass::ConsistencyLow as i32,
+        flags: vec![ConsistencyFlag::BehaviorDrift as i32, ConsistencyFlag::RiskDrift as i32],
+        recommended_noise_class: NoiseClass::Med as i32,
+        consolidation_eligibility: ConsolidationEligibility::Allow as i32,
+        replay_trigger_hint: true,
+        trigger_reason_codes: Some(ReasonCodes {
+            codes: sorted_strings(&["drift-detected", "replay-recommended"]),
+        }),
+        proof_receipt_ref: Some(Ref {
+            uri: "proof://consistency/receipt".to_string(),
+            label: "proof".to_string(),
+        }),
+    };
+
+    let classify_inputs = sorted_strings(&["text/plain", "image/png"]);
     let classify_action = ToolActionProfile {
         action_id: "tool-classify".to_string(),
         display_name: "Classifier".to_string(),
@@ -275,8 +457,7 @@ fn main() -> anyhow::Result<()> {
         requires_approval: true,
     };
 
-    let mut storage_inputs = vec!["application/json".to_string()];
-    ensure_sorted(&mut storage_inputs);
+    let storage_inputs = sorted_strings(&["application/json"]);
     let storage_action = ToolActionProfile {
         action_id: "tool-store".to_string(),
         display_name: "Storage writer".to_string(),
@@ -317,69 +498,53 @@ fn main() -> anyhow::Result<()> {
         review_status: "accepted".to_string(),
     };
 
-    let registry_bytes = canonical_bytes(&registry_container);
-    let registry_digest = digest32(domain, "ucf.v1.ToolRegistryContainer", "1", &registry_bytes);
-    write_fixture("tool_registry_container", &registry_bytes, registry_digest)?;
+    let aap = {
+        let objectives = sorted_strings(&["capture approvals", "ensure auditability"]);
+        let approval_reasons = sorted_strings(&["policy-aligned", "risk-low"]);
+        let approval = ApprovalDecision {
+            approver: "lead-operator".to_string(),
+            decision: DecisionForm::Allow as i32,
+            reason_codes: Some(ReasonCodes { codes: approval_reasons }),
+            summary: "Approved for pilot".to_string(),
+        };
 
-    let onboarding_bytes = canonical_bytes(&onboarding_event);
-    let onboarding_digest = digest32(domain, "ucf.v1.ToolOnboardingEvent", "1", &onboarding_bytes);
-    write_fixture("tool_onboarding_event", &onboarding_bytes, onboarding_digest)?;
+        let recovery_steps = sorted_strings(&["notify-owner", "reset-plan"]);
+        let recovery = RecoveryCase {
+            trigger: "missing-approval".to_string(),
+            steps: recovery_steps,
+            owner: "duty-officer".to_string(),
+        };
 
-    let mut objectives = vec!["capture approvals".to_string(), "ensure auditability".to_string()];
-    ensure_sorted(&mut objectives);
+        let stop_event = StopEvent {
+            reason: "completed".to_string(),
+            actor: "supervisor".to_string(),
+            timestamp: 1_700_001_234,
+            summary: "Plan concluded".to_string(),
+        };
 
-    let mut approval_reasons = vec!["policy-aligned".to_string(), "risk-low".to_string()];
-    ensure_sorted(&mut approval_reasons);
-    let approval = ApprovalDecision {
-        approver: "lead-operator".to_string(),
-        decision: DecisionForm::Allow as i32,
-        reason_codes: Some(ReasonCodes { codes: approval_reasons }),
-        summary: "Approved for pilot".to_string(),
+        Aap {
+            plan_id: "aap-42".to_string(),
+            session_id: "session-9000".to_string(),
+            objectives,
+            approvals: vec![approval],
+            recoveries: vec![recovery],
+            stop_event: Some(stop_event),
+        }
     };
 
-    let mut recovery_steps = vec!["notify-owner".to_string(), "reset-plan".to_string()];
-    ensure_sorted(&mut recovery_steps);
-    let recovery = RecoveryCase {
-        trigger: "missing-approval".to_string(),
-        steps: recovery_steps,
-        owner: "duty-officer".to_string(),
+    let sep_event = {
+        let mut parent_events = vec!["evt-root".to_string(), "evt-boot".to_string()];
+        parent_events.sort();
+        SepEvent {
+            session_id: "session-9000".to_string(),
+            event_id: "evt-1".to_string(),
+            phase: "plan".to_string(),
+            parents: parent_events,
+            payload: "kickoff".to_string(),
+            timestamp: 1_700_002_000,
+            summary: Some("Initial planning event".to_string()),
+        }
     };
-
-    let stop_event = StopEvent {
-        reason: "completed".to_string(),
-        actor: "supervisor".to_string(),
-        timestamp: 1_700_001_234,
-        summary: "Plan concluded".to_string(),
-    };
-
-    let aap = Aap {
-        plan_id: "aap-42".to_string(),
-        session_id: "session-9000".to_string(),
-        objectives,
-        approvals: vec![approval],
-        recoveries: vec![recovery],
-        stop_event: Some(stop_event),
-    };
-
-    let aap_bytes = canonical_bytes(&aap);
-    let aap_digest = digest32(domain, "ucf.v1.AAP", "1", &aap_bytes);
-    write_fixture("aap_with_recovery", &aap_bytes, aap_digest)?;
-
-    let mut parent_events = vec!["evt-root".to_string(), "evt-boot".to_string()];
-    ensure_sorted(&mut parent_events);
-    let sep_event = SepEvent {
-        session_id: "session-9000".to_string(),
-        event_id: "evt-1".to_string(),
-        phase: "plan".to_string(),
-        parents: parent_events,
-        payload: "kickoff".to_string(),
-        timestamp: 1_700_002_000,
-        summary: Some("Initial planning event".to_string()),
-    };
-
-    let sep_bytes = canonical_bytes(&sep_event);
-    let sep_digest = digest32(domain, "ucf.v1.SepEvent", "1", &sep_bytes);
-    write_fixture("sep_event_chain", &sep_bytes, sep_digest)?;
 
     let session_seal = SessionSeal {
         session_id: "session-9000".to_string(),
@@ -393,10 +558,6 @@ fn main() -> anyhow::Result<()> {
         summary: Some("Session closed".to_string()),
     };
 
-    let seal_bytes = canonical_bytes(&session_seal);
-    let seal_digest = digest32(domain, "ucf.v1.SessionSeal", "1", &seal_bytes);
-    write_fixture("session_seal", &seal_bytes, seal_digest)?;
-
     let completeness_report = CompletenessReport {
         session_id: "session-9000".to_string(),
         observed_events: 3,
@@ -405,11 +566,45 @@ fn main() -> anyhow::Result<()> {
         summary: Some("All planned events observed".to_string()),
     };
 
-    let completeness_bytes = canonical_bytes(&completeness_report);
-    let completeness_digest =
-        digest32(domain, "ucf.v1.CompletenessReport", "1", &completeness_bytes);
-    write_fixture("completeness_report", &completeness_bytes, completeness_digest)?;
+    emit_fixture("canonical_intent_query", "ucf.v1.CanonicalIntent", &canonical_intent, domain)?;
+    emit_fixture("policy_decision", "ucf.v1.PolicyDecision", &policy_decision, domain)?;
+    emit_fixture("pvgs_receipt", "ucf.v1.PVGSReceipt", &pvgs_receipt, domain)?;
+    emit_fixture("signal_frame_short_window", "ucf.v1.SignalFrame", &signal_frame, domain)?;
+    emit_fixture("control_frame_m1_overlays_on", "ucf.v1.ControlFrame", &control_frame, domain)?;
+    emit_fixture(
+        "experience_rt_perception",
+        "ucf.v1.ExperienceRecord",
+        &experience_rt_perception,
+        domain,
+    )?;
+    emit_fixture(
+        "experience_rt_action_exec",
+        "ucf.v1.ExperienceRecord",
+        &experience_rt_action_exec,
+        domain,
+    )?;
+    emit_fixture("experience_rt_output", "ucf.v1.ExperienceRecord", &experience_rt_output, domain)?;
+    emit_fixture("micro_milestone_sealed", "ucf.v1.MicroMilestone", &micro_milestone, domain)?;
+    emit_fixture("meso_milestone_stable", "ucf.v1.MesoMilestone", &meso_milestone, domain)?;
+    emit_fixture("macro_milestone_finalized", "ucf.v1.MacroMilestone", &macro_milestone, domain)?;
+    emit_fixture("replay_plan_high_fidelity", "ucf.v1.ReplayPlan", &replay_plan, domain)?;
+    emit_fixture(
+        "consistency_feedback_low_flags",
+        "ucf.v1.ConsistencyFeedback",
+        &consistency_feedback,
+        domain,
+    )?;
+    emit_fixture(
+        "tool_registry_container",
+        "ucf.v1.ToolRegistryContainer",
+        &registry_container,
+        domain,
+    )?;
+    emit_fixture("tool_onboarding_event", "ucf.v1.ToolOnboardingEvent", &onboarding_event, domain)?;
+    emit_fixture("aap_with_recovery", "ucf.v1.AAP", &aap, domain)?;
+    emit_fixture("sep_event_chain", "ucf.v1.SepEvent", &sep_event, domain)?;
+    emit_fixture("session_seal", "ucf.v1.SessionSeal", &session_seal, domain)?;
+    emit_fixture("completeness_report", "ucf.v1.CompletenessReport", &completeness_report, domain)?;
 
-    println!("Fixtures written to testvectors/");
     Ok(())
 }
