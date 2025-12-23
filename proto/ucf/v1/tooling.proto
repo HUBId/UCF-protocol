@@ -2,37 +2,209 @@ syntax = "proto3";
 
 package ucf.v1;
 
-import "ucf/v1/frames.proto";
+import "ucf/v1/common.proto";
+import "ucf/v1/pvgs.proto";
 
-// Profile describing an action exposed by a tool or adapter.
+enum ToolActionType {
+  TOOL_ACTION_TYPE_UNSPECIFIED = 0;
+  TOOL_ACTION_TYPE_READ = 1;
+  TOOL_ACTION_TYPE_WRITE = 2;
+  TOOL_ACTION_TYPE_EXECUTE = 3;
+  TOOL_ACTION_TYPE_EXPORT = 4;
+  TOOL_ACTION_TYPE_TRANSFORM = 5;
+}
+
+enum Reversibility {
+  REVERSIBILITY_UNSPECIFIED = 0;
+  REVERSIBILITY_REVERSIBLE = 1;
+  REVERSIBILITY_PARTIAL = 2;
+  REVERSIBILITY_IRREVERSIBLE = 3;
+}
+
+enum SideEffectClass {
+  SIDE_EFFECT_CLASS_UNSPECIFIED = 0;
+  SIDE_EFFECT_CLASS_NONE = 1;
+  SIDE_EFFECT_CLASS_SOFT = 2;
+  SIDE_EFFECT_CLASS_HARD = 3;
+}
+
+enum ScopeShape {
+  SCOPE_SHAPE_UNSPECIFIED = 0;
+  SCOPE_SHAPE_SINGLE = 1;
+  SCOPE_SHAPE_BOUNDED_LIST = 2;
+  SCOPE_SHAPE_QUERY_BOUNDED = 3;
+  SCOPE_SHAPE_QUERY_UNBOUNDED = 4;
+}
+
+enum AdapterType {
+  ADAPTER_TYPE_UNSPECIFIED = 0;
+  ADAPTER_TYPE_HTTP_GRPC = 1;
+  ADAPTER_TYPE_STORAGE_GATE = 2;
+  ADAPTER_TYPE_SANDBOX_COMPUTE = 3;
+  ADAPTER_TYPE_EXPORT_RENDERER = 4;
+}
+
+enum OnboardingStage {
+  ONBOARDING_STAGE_UNSPECIFIED = 0;
+  ONBOARDING_STAGE_TO0_PROPOSED = 1;
+  ONBOARDING_STAGE_TO1_PROFILED = 2;
+  ONBOARDING_STAGE_TO2_VALIDATED = 3;
+  ONBOARDING_STAGE_TO3_APPROVED = 4;
+  ONBOARDING_STAGE_TO4_ACTIVE = 5;
+  ONBOARDING_STAGE_TO5_PAUSED = 6;
+  ONBOARDING_STAGE_TO6_SUSPENDED = 7;
+  ONBOARDING_STAGE_TO6_REVOKED = 8;
+}
+
+enum RetryClass {
+  RETRY_CLASS_UNSPECIFIED = 0;
+  RETRY_CLASS_RETRY_NONE = 1;
+  RETRY_CLASS_RETRY_LOW = 2;
+  RETRY_CLASS_RETRY_MED = 3;
+}
+
+enum TimeoutClass {
+  TIMEOUT_CLASS_UNSPECIFIED = 0;
+  TIMEOUT_CLASS_TIMEOUT_SHORT = 1;
+  TIMEOUT_CLASS_TIMEOUT_MED = 2;
+  TIMEOUT_CLASS_TIMEOUT_LONG = 3;
+}
+
+enum RateLimitClass {
+  RATE_LIMIT_CLASS_UNSPECIFIED = 0;
+  RATE_LIMIT_CLASS_RATE_LOW = 1;
+  RATE_LIMIT_CLASS_RATE_MED = 2;
+  RATE_LIMIT_CLASS_RATE_HIGH = 3;
+}
+
+enum SizeClass {
+  SIZE_CLASS_UNSPECIFIED = 0;
+  SIZE_CLASS_SIZE_SMALL = 1;
+  SIZE_CLASS_SIZE_MED = 2;
+  SIZE_CLASS_SIZE_LARGE = 3;
+}
+
+enum CostClass {
+  COST_CLASS_UNSPECIFIED = 0;
+  COST_CLASS_COST_LOW = 1;
+  COST_CLASS_COST_MED = 2;
+  COST_CLASS_COST_HIGH = 3;
+}
+
+enum SimulationFidelity {
+  SIMULATION_FIDELITY_UNSPECIFIED = 0;
+  SIMULATION_FIDELITY_LOW = 1;
+  SIMULATION_FIDELITY_MED = 2;
+  SIMULATION_FIDELITY_HIGH = 3;
+}
+
+message TypedSchema {
+  string schema_id = 1;
+  Digest32 schema_digest = 2;
+  uint32 max_fields = 3;
+}
+
+message ToolConstraintsDefaults {
+  SizeClass max_bytes_out_class = 1;
+  SizeClass max_items_out_class = 2;
+  TimeoutClass timeout_class = 3;
+  RateLimitClass rate_limit_class = 4;
+  bool allow_unbounded_query = 5;
+}
+
+message RetryPolicy {
+  bool retry_allowed = 1;
+  RetryClass retry_class = 2;
+}
+
+message SimulationMode {
+  bool simulatable = 1;
+  string sim_tool_id = 2;
+  string sim_action_id = 3;
+  SimulationFidelity sim_fidelity_class = 4;
+}
+
+message CostModel {
+  CostClass base_cost_class = 1;
+  CostClass scope_multiplier_class = 2;
+  CostClass data_multiplier_class = 3;
+  CostClass irreversibility_multiplier_class = 4;
+}
+
+message AttestationRequirements {
+  bool artifact_digest_required = 1;
+  repeated Digest32 allowed_artifact_digests = 2;
+}
+
+message LoggingRequirements {
+  bool require_outcome_digest = 1;
+  bool require_tool_version_digest = 2;
+  bool require_side_effect_indicators = 3;
+}
+
+message DataClassCondition {
+  string param_name = 1;
+  string op = 2;
+  string value = 3;
+  DataClass result_data_class = 4;
+}
+
 message ToolActionProfile {
-  string action_id = 1;
-  string display_name = 2;
-  ToolClass tool_class = 3;
-  repeated string input_types = 4;
-  string output_type = 5;
-  bool requires_approval = 6;
-}
-
-// Mapping between adapters and the tool identifiers they surface.
-message AdapterMapEntry {
-  string adapter = 1;
-  string tool_id = 2;
-  string version = 3;
-}
-
-// Container for publishing the current registry state for tools and adapters.
-message ToolRegistryContainer {
-  repeated ToolActionProfile actions = 1;
-  repeated AdapterMapEntry adapters = 2;
-  string steward = 3;
-  uint64 updated_at = 4;
-}
-
-// Event emitted when a tool is onboarded into the registry.
-message ToolOnboardingEvent {
   string tool_id = 1;
-  string submitted_by = 2;
-  ToolActionProfile profile = 3;
-  string review_status = 4;
+  string action_id = 2;
+  string profile_version = 3;
+  Digest32 profile_digest = 4;
+  ToolActionType action_type = 5;
+  Reversibility reversibility = 6;
+  SideEffectClass side_effect_class = 7;
+  ScopeShape scope_shape = 8;
+  DataClass max_data_class_out = 9;
+  TypedSchema input_schema = 10;
+  TypedSchema output_schema = 11;
+  ToolConstraintsDefaults default_constraints = 12;
+  RetryPolicy retry_policy = 13;
+  SimulationMode simulation_mode = 14;
+  CostModel cost_model = 15;
+  AttestationRequirements attestation_requirements = 16;
+  LoggingRequirements logging_requirements = 17;
+  repeated DataClassCondition data_class_conditions = 18;
+  repeated string expected_side_effect_indicators = 19;
+  repeated string known_failure_modes = 20;
+}
+
+message ToolRegistryContainer {
+  string registry_id = 1;
+  string registry_version = 2;
+  Digest32 registry_digest = 3;
+  repeated ToolActionProfile tool_actions = 4;
+  uint64 created_at_ms = 5;
+  ProofReceipt proof_receipt_ref = 6;
+  Signature attestation_sig = 7;
+}
+
+message ToolOnboardingEvent {
+  string event_id = 1;
+  Digest32 event_digest = 2;
+  string tool_id = 3;
+  string action_id = 4;
+  OnboardingStage stage = 5;
+  ReasonCodes stage_reason_codes = 6;
+  repeated Digest32 required_artifact_digests = 7;
+  repeated Ref test_evidence_refs = 8;
+  repeated Signature signatures = 9;
+  ProofReceipt proof_receipt_ref = 10;
+}
+
+message AdapterConstraints {
+  SizeClass max_payload_in_class = 1;
+  SizeClass max_payload_out_class = 2;
+  DataClass allowed_destination_class = 3;
+}
+
+message ToolAdapterMapEntry {
+  string tool_id = 1;
+  string action_id = 2;
+  AdapterType adapter_type = 3;
+  Ref endpoint_ref = 4;
+  AdapterConstraints adapter_constraints = 5;
 }

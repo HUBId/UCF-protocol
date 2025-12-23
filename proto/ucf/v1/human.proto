@@ -3,36 +3,133 @@ syntax = "proto3";
 package ucf.v1;
 
 import "ucf/v1/common.proto";
+import "ucf/v1/canonical.proto";
+import "ucf/v1/policy.proto";
+import "ucf/v1/pvgs.proto";
+import "ucf/v1/frames.proto";
+import "ucf/v1/tooling.proto";
 
-// Action Assurance Plan capturing human approvals and contingencies.
-message AAP {
-  string plan_id = 1;
-  string session_id = 2;
-  repeated string objectives = 3;
-  repeated ApprovalDecision approvals = 4;
-  repeated RecoveryCase recoveries = 5;
-  StopEvent stop_event = 6;
+enum RequestedOperation {
+  REQUESTED_OPERATION_UNSPECIFIED = 0;
+  REQUESTED_OPERATION_OP_WRITE = 1;
+  REQUESTED_OPERATION_OP_EXECUTE = 2;
+  REQUESTED_OPERATION_OP_EXPORT = 3;
+  REQUESTED_OPERATION_OP_PERSIST = 4;
+  REQUESTED_OPERATION_OP_EXCEPTION = 5;
+  REQUESTED_OPERATION_OP_RECOVERY = 6;
 }
 
-// Individual approval decision.
+enum ApprovalDecisionType {
+  APPROVAL_DECISION_TYPE_UNSPECIFIED = 0;
+  APPROVAL_DECISION_TYPE_APPROVE = 1;
+  APPROVAL_DECISION_TYPE_DENY = 2;
+  APPROVAL_DECISION_TYPE_APPROVE_WITH_MODIFICATIONS = 3;
+}
+
+enum TwoPersonRequirement {
+  TWO_PERSON_REQUIREMENT_UNSPECIFIED = 0;
+  TWO_PERSON_REQUIREMENT_NONE = 1;
+  TWO_PERSON_REQUIREMENT_ONE = 2;
+  TWO_PERSON_REQUIREMENT_TWO = 3;
+}
+
+enum RecoveryState {
+  RECOVERY_STATE_UNSPECIFIED = 0;
+  RECOVERY_STATE_R0_CAPTURED = 1;
+  RECOVERY_STATE_R1_SCOPED = 2;
+  RECOVERY_STATE_R2_STABILIZED = 3;
+  RECOVERY_STATE_R3_DIAGNOSED = 4;
+  RECOVERY_STATE_R4_REMEDIATED = 5;
+  RECOVERY_STATE_R5_VALIDATED = 6;
+  RECOVERY_STATE_R6_MONITORING = 7;
+  RECOVERY_STATE_R7_CLOSED = 8;
+}
+
+enum RecoveryCheck {
+  RECOVERY_CHECK_UNSPECIFIED = 0;
+  RECOVERY_CHECK_CHK_EVIDENCE_OK = 1;
+  RECOVERY_CHECK_CHK_ROOT_CAUSE_IDENTIFIED = 2;
+  RECOVERY_CHECK_CHK_CONTROLS_UPDATED = 3;
+  RECOVERY_CHECK_CHK_VALIDATION_PASSED = 4;
+  RECOVERY_CHECK_CHK_COOLDOWN_WINDOW_MET = 5;
+}
+
+enum StopAction {
+  STOP_ACTION_UNSPECIFIED = 0;
+  STOP_ACTION_STOP_FREEZE = 1;
+  STOP_ACTION_STOP_QUARANTINE = 2;
+  STOP_ACTION_STOP_FORENSIC = 3;
+}
+
+enum AlternativeType {
+  ALTERNATIVE_TYPE_UNSPECIFIED = 0;
+  ALTERNATIVE_TYPE_DO_NOTHING = 1;
+  ALTERNATIVE_TYPE_SIMULATE_FIRST = 2;
+  ALTERNATIVE_TYPE_NARROW_SCOPE = 3;
+}
+
+message Alternative {
+  AlternativeType alt_type = 1;
+  oneof expected_cost {
+    CostClass expected_cost_class = 2;
+    uint32 expected_cost_bucket = 3;
+  }
+  Digest32 pros_cons_digest = 4;
+}
+
+message ApprovalArtifactPackage {
+  string aap_id = 1;
+  Digest32 aap_digest = 2;
+  string session_id = 3;
+  Ref intent_ref = 4;
+  Ref action_spec_ref = 5;
+  Ref decision_ref = 6;
+  string charter_version_digest = 7;
+  string policy_version_digest = 8;
+  Digest32 profile_digest = 9;
+  RequestedOperation requested_operation = 10;
+  RiskLevel risk_level = 11;
+  DataClass requested_data_class = 12;
+  ConstraintsDelta constraints_proposal = 13;
+  repeated Alternative alternatives = 14;
+  repeated Ref evidence_refs = 15;
+  uint64 expires_at_ms = 16;
+  TwoPersonRequirement two_person_requirement = 17;
+}
+
 message ApprovalDecision {
-  string approver = 1;
-  DecisionForm decision = 2;
-  ReasonCodes reason_codes = 3;
-  string summary = 4;
+  string approval_id = 1;
+  Digest32 approval_digest = 2;
+  Digest32 aap_digest = 3;
+  ApprovalDecisionType decision = 4;
+  ConstraintsDelta modifications = 5;
+  ReasonCodes reason_codes = 6;
+  repeated Signature signatures = 7;
+  uint64 expires_at_ms = 8;
+  ProofReceipt proof_receipt_ref = 9;
 }
 
-// Recovery path to follow for a given trigger.
-message RecoveryCase {
-  string trigger = 1;
-  repeated string steps = 2;
-  string owner = 3;
-}
-
-// Terminal stop signal issued by a human or system.
 message StopEvent {
-  string reason = 1;
-  string actor = 2;
-  uint64 timestamp = 3;
-  string summary = 4;
+  string stop_id = 1;
+  Digest32 stop_digest = 2;
+  string scope = 3;
+  StopAction action = 4;
+  ReasonCodes reason_codes = 5;
+  Signature signature = 6;
+  string attestation_key_id = 7;
+  ProofReceipt proof_receipt_ref = 8;
+}
+
+message RecoveryCase {
+  string recovery_id = 1;
+  Digest32 recovery_digest = 2;
+  string scope = 3;
+  repeated Ref trigger_refs = 4;
+  RecoveryState state = 5;
+  repeated RecoveryCheck required_checks = 6;
+  repeated RecoveryCheck completed_checks = 7;
+  bool inspector_required = 8;
+  bool steward_required = 9;
+  repeated Ref related_digests = 10;
+  ProofReceipt proof_receipt_ref = 11;
 }

@@ -22,7 +22,8 @@ const REPLAY_PLAN_SCHEMA: &str = "ucf.v1.ReplayPlan";
 const CONSISTENCY_FEEDBACK_SCHEMA: &str = "ucf.v1.ConsistencyFeedback";
 const TOOL_REGISTRY_SCHEMA: &str = "ucf.v1.ToolRegistryContainer";
 const TOOL_ONBOARDING_SCHEMA: &str = "ucf.v1.ToolOnboardingEvent";
-const AAP_SCHEMA: &str = "ucf.v1.AAP";
+const APPROVAL_ARTIFACT_PACKAGE_SCHEMA: &str = "ucf.v1.ApprovalArtifactPackage";
+const APPROVAL_DECISION_SCHEMA: &str = "ucf.v1.ApprovalDecision";
 const SEP_EVENT_SCHEMA: &str = "ucf.v1.SepEvent";
 const SESSION_SEAL_SCHEMA: &str = "ucf.v1.SessionSeal";
 const COMPLETENESS_REPORT_SCHEMA: &str = "ucf.v1.CompletenessReport";
@@ -750,50 +751,99 @@ fn consistency_feedback_low_flags_roundtrip() -> Result<()> {
 
 #[test]
 fn tool_registry_container_roundtrip() -> Result<()> {
-    let mut classify_inputs = vec!["image/png".to_string(), "text/plain".to_string()];
-    classify_inputs.sort();
-    let classify_action = ToolActionProfile {
-        action_id: "tool-classify".to_string(),
-        display_name: "Classifier".to_string(),
-        tool_class: ToolClass::Model as i32,
-        input_types: classify_inputs,
-        output_type: "application/json".to_string(),
-        requires_approval: true,
+    let default_constraints = ToolConstraintsDefaults {
+        max_bytes_out_class: SizeClass::SizeSmall as i32,
+        max_items_out_class: SizeClass::SizeMed as i32,
+        timeout_class: TimeoutClass::TimeoutShort as i32,
+        rate_limit_class: RateLimitClass::RateMed as i32,
+        allow_unbounded_query: false,
     };
 
-    let mut storage_inputs = vec!["application/json".to_string()];
-    storage_inputs.sort();
-    let storage_action = ToolActionProfile {
-        action_id: "tool-store".to_string(),
-        display_name: "Storage writer".to_string(),
-        tool_class: ToolClass::Storage as i32,
-        input_types: storage_inputs,
-        output_type: "application/octet-stream".to_string(),
-        requires_approval: false,
+    let data_class_conditions = vec![DataClassCondition {
+        param_name: "query".to_string(),
+        op: "eq".to_string(),
+        value: "latest".to_string(),
+        result_data_class: DataClass::Public as i32,
+    }];
+
+    let tool_action = ToolActionProfile {
+        tool_id: "sensor-service".to_string(),
+        action_id: "read-latest".to_string(),
+        profile_version: "1.0.0".to_string(),
+        profile_digest: Some(Digest32 { value: vec![0x10; 32] }),
+        action_type: ToolActionType::Read as i32,
+        reversibility: Reversibility::Reversible as i32,
+        side_effect_class: SideEffectClass::None as i32,
+        scope_shape: ScopeShape::Single as i32,
+        max_data_class_out: DataClass::Confidential as i32,
+        input_schema: Some(TypedSchema {
+            schema_id: "ucf.v1.ReadInput".to_string(),
+            schema_digest: Some(Digest32 { value: vec![0xA1; 32] }),
+            max_fields: 4,
+        }),
+        output_schema: Some(TypedSchema {
+            schema_id: "ucf.v1.ReadOutput".to_string(),
+            schema_digest: Some(Digest32 { value: vec![0xB2; 32] }),
+            max_fields: 6,
+        }),
+        default_constraints: Some(default_constraints),
+        retry_policy: Some(RetryPolicy {
+            retry_allowed: true,
+            retry_class: RetryClass::RetryLow as i32,
+        }),
+        simulation_mode: Some(SimulationMode {
+            simulatable: true,
+            sim_tool_id: "sim-sensor".to_string(),
+            sim_action_id: "simulate-read".to_string(),
+            sim_fidelity_class: SimulationFidelity::Med as i32,
+        }),
+        cost_model: Some(CostModel {
+            base_cost_class: CostClass::CostLow as i32,
+            scope_multiplier_class: CostClass::CostMed as i32,
+            data_multiplier_class: CostClass::CostMed as i32,
+            irreversibility_multiplier_class: CostClass::CostLow as i32,
+        }),
+        attestation_requirements: Some(AttestationRequirements {
+            artifact_digest_required: true,
+            allowed_artifact_digests: vec![
+                Digest32 { value: vec![0x01; 32] },
+                Digest32 { value: vec![0x02; 32] },
+            ],
+        }),
+        logging_requirements: Some(LoggingRequirements {
+            require_outcome_digest: true,
+            require_tool_version_digest: true,
+            require_side_effect_indicators: false,
+        }),
+        data_class_conditions,
+        expected_side_effect_indicators: vec!["cache-read".to_string(), "trace".to_string()],
+        known_failure_modes: vec!["timeout".to_string(), "unreachable".to_string()],
     };
 
-    let mut actions = vec![classify_action.clone(), storage_action.clone()];
-    actions.sort_by(|a, b| a.action_id.cmp(&b.action_id));
-
-    let mut adapters = vec![
-        AdapterMapEntry {
-            adapter: "http-adapter".to_string(),
-            tool_id: "tool-classify".to_string(),
-            version: "v1.2.3".to_string(),
-        },
-        AdapterMapEntry {
-            adapter: "s3-adapter".to_string(),
-            tool_id: "tool-store".to_string(),
-            version: "v2.0".to_string(),
-        },
-    ];
-    adapters.sort_by(|a, b| a.adapter.cmp(&b.adapter));
+    let mut tool_actions = vec![tool_action];
+    tool_actions.sort_by(|a, b| a.action_id.cmp(&b.action_id));
 
     let expected = ToolRegistryContainer {
-        actions,
-        adapters,
-        steward: "registry-admin".to_string(),
-        updated_at: 1_700_000_000,
+        registry_id: "registry-alpha".to_string(),
+        registry_version: "2024-01".to_string(),
+        registry_digest: Some(Digest32 { value: vec![0xCC; 32] }),
+        tool_actions,
+        created_at_ms: 1_700_003_000,
+        proof_receipt_ref: Some(ProofReceipt {
+            status: ReceiptStatus::Accepted as i32,
+            receipt_digest: Some(Digest32 { value: vec![0xAA; 32] }),
+            validator: Some(Signature {
+                algorithm: "ed25519".to_string(),
+                signer: vec![0x01, 0x02],
+                signature: vec![0x03, 0x04],
+            }),
+            vrf_digest: Some(Digest32 { value: vec![0x10; 32] }),
+        }),
+        attestation_sig: Some(Signature {
+            algorithm: "ed25519".to_string(),
+            signer: vec![0x10, 0x11, 0x12],
+            signature: vec![0x21, 0x22, 0x23],
+        }),
     };
 
     verify_roundtrip("tool_registry_container", TOOL_REGISTRY_SCHEMA, expected)
@@ -801,96 +851,221 @@ fn tool_registry_container_roundtrip() -> Result<()> {
 
 #[test]
 fn tool_onboarding_event_roundtrip() -> Result<()> {
-    let mut classify_inputs = vec!["image/png".to_string(), "text/plain".to_string()];
-    classify_inputs.sort();
-    let classify_action = ToolActionProfile {
-        action_id: "tool-classify".to_string(),
-        display_name: "Classifier".to_string(),
-        tool_class: ToolClass::Model as i32,
-        input_types: classify_inputs,
-        output_type: "application/json".to_string(),
-        requires_approval: true,
-    };
-
     let expected = ToolOnboardingEvent {
-        tool_id: "tool-classify".to_string(),
-        submitted_by: "ops-team".to_string(),
-        profile: Some(classify_action),
-        review_status: "accepted".to_string(),
+        event_id: "onboard-evt-01".to_string(),
+        event_digest: Some(Digest32 { value: vec![0x0A; 32] }),
+        tool_id: "sensor-service".to_string(),
+        action_id: "read-latest".to_string(),
+        stage: OnboardingStage::To6Suspended as i32,
+        stage_reason_codes: Some(ReasonCodes {
+            codes: sorted_strings(&["missing-attestation", "risk-review"]),
+        }),
+        required_artifact_digests: vec![Digest32 { value: vec![0x05; 32] }],
+        test_evidence_refs: vec![Ref {
+            uri: "evidence://test/report".to_string(),
+            label: "report".to_string(),
+        }],
+        signatures: vec![Signature {
+            algorithm: "ed25519".to_string(),
+            signer: vec![0xAA, 0xBB],
+            signature: vec![0xCC, 0xDD],
+        }],
+        proof_receipt_ref: Some(ProofReceipt {
+            status: ReceiptStatus::Pending as i32,
+            receipt_digest: Some(Digest32 { value: vec![0x09; 32] }),
+            validator: Some(Signature {
+                algorithm: "ed25519".to_string(),
+                signer: vec![0xFE],
+                signature: vec![0xEE],
+            }),
+            vrf_digest: Some(Digest32 { value: vec![0x0F; 32] }),
+        }),
     };
 
     verify_roundtrip("tool_onboarding_event", TOOL_ONBOARDING_SCHEMA, expected)
 }
 
 #[test]
-fn aap_with_recovery_roundtrip() -> Result<()> {
-    let mut objectives = vec!["capture approvals".to_string(), "ensure auditability".to_string()];
-    objectives.sort();
+fn approval_artifact_package_roundtrip() -> Result<()> {
+    let alternatives = vec![
+        Alternative {
+            alt_type: AlternativeType::SimulateFirst as i32,
+            expected_cost: Some(alternative::ExpectedCost::ExpectedCostClass(
+                CostClass::CostMed as i32,
+            )),
+            pros_cons_digest: Some(Digest32 { value: vec![0xAB; 32] }),
+        },
+        Alternative {
+            alt_type: AlternativeType::NarrowScope as i32,
+            expected_cost: Some(alternative::ExpectedCost::ExpectedCostBucket(2)),
+            pros_cons_digest: Some(Digest32 { value: vec![0xBC; 32] }),
+        },
+    ];
 
-    let mut approval_reasons = vec!["policy-aligned".to_string(), "risk-low".to_string()];
-    approval_reasons.sort();
-    let approval = ApprovalDecision {
-        approver: "lead-operator".to_string(),
-        decision: DecisionForm::Allow as i32,
-        reason_codes: Some(ReasonCodes { codes: approval_reasons }),
-        summary: "Approved for pilot".to_string(),
-    };
+    let evidence_refs = vec![
+        Ref { uri: "evidence://logs/primary".to_string(), label: "logs".to_string() },
+        Ref { uri: "evidence://report/risk".to_string(), label: "risk".to_string() },
+    ];
 
-    let mut recovery_steps = vec!["notify-owner".to_string(), "reset-plan".to_string()];
-    recovery_steps.sort();
-    let recovery = RecoveryCase {
-        trigger: "missing-approval".to_string(),
-        steps: recovery_steps,
-        owner: "duty-officer".to_string(),
-    };
-
-    let expected = Aap {
-        plan_id: "aap-42".to_string(),
+    let expected = ApprovalArtifactPackage {
+        aap_id: "aap-42".to_string(),
+        aap_digest: Some(Digest32 { value: vec![0x44; 32] }),
         session_id: "session-9000".to_string(),
-        objectives,
-        approvals: vec![approval],
-        recoveries: vec![recovery],
-        stop_event: Some(StopEvent {
-            reason: "completed".to_string(),
-            actor: "supervisor".to_string(),
-            timestamp: 1_700_001_234,
-            summary: "Plan concluded".to_string(),
+        intent_ref: Some(Ref {
+            uri: "intent://primary/42".to_string(),
+            label: "intent".to_string(),
+        }),
+        action_spec_ref: Some(Ref {
+            uri: "action://spec/read".to_string(),
+            label: "action-spec".to_string(),
+        }),
+        decision_ref: Some(Ref {
+            uri: "decision://placeholder".to_string(),
+            label: "decision".to_string(),
+        }),
+        charter_version_digest: "charter:v5".to_string(),
+        policy_version_digest: "policy:v7".to_string(),
+        profile_digest: Some(Digest32 { value: vec![0x45; 32] }),
+        requested_operation: RequestedOperation::OpWrite as i32,
+        risk_level: RiskLevel::Medium as i32,
+        requested_data_class: DataClass::Restricted as i32,
+        constraints_proposal: Some(ConstraintsDelta {
+            constraints_added: sorted_strings(&["approval-required", "scope-narrowing"]),
+            constraints_removed: vec!["legacy-exception".to_string()],
+        }),
+        alternatives,
+        evidence_refs,
+        expires_at_ms: 1_700_020_000,
+        two_person_requirement: TwoPersonRequirement::Two as i32,
+    };
+
+    verify_roundtrip("approval_artifact_package", APPROVAL_ARTIFACT_PACKAGE_SCHEMA, expected)
+}
+
+#[test]
+fn approval_decision_roundtrip() -> Result<()> {
+    let expected = ApprovalDecision {
+        approval_id: "approval-01".to_string(),
+        approval_digest: Some(Digest32 { value: vec![0x55; 32] }),
+        aap_digest: Some(Digest32 { value: vec![0x44; 32] }),
+        decision: ApprovalDecisionType::ApproveWithModifications as i32,
+        modifications: Some(ConstraintsDelta {
+            constraints_added: vec!["cooldown-required".to_string()],
+            constraints_removed: vec![],
+        }),
+        reason_codes: Some(ReasonCodes { codes: sorted_strings(&["two-person", "risk-review"]) }),
+        signatures: vec![Signature {
+            algorithm: "ed25519".to_string(),
+            signer: vec![0xAA],
+            signature: vec![0xBB],
+        }],
+        expires_at_ms: 1_700_030_000,
+        proof_receipt_ref: Some(ProofReceipt {
+            status: ReceiptStatus::Accepted as i32,
+            receipt_digest: Some(Digest32 { value: vec![0x46; 32] }),
+            validator: Some(Signature {
+                algorithm: "ed25519".to_string(),
+                signer: vec![0x0A, 0x0B],
+                signature: vec![0x0C, 0x0D],
+            }),
+            vrf_digest: Some(Digest32 { value: vec![0x0E; 32] }),
         }),
     };
 
-    verify_roundtrip("aap_with_recovery", AAP_SCHEMA, expected)
+    verify_roundtrip("approval_decision", APPROVAL_DECISION_SCHEMA, expected)
 }
 
 #[test]
 fn sep_event_chain_roundtrip() -> Result<()> {
-    let mut parent_events = vec!["evt-boot".to_string(), "evt-root".to_string()];
-    parent_events.sort();
+    let events = vec![
+        (
+            "sep_event_chain_1",
+            SepEvent {
+                event_id: "evt-1".to_string(),
+                session_id: "session-9000".to_string(),
+                event_type: SepEventType::EvIntent as i32,
+                object_ref: Some(Ref {
+                    uri: "intent://primary/42".to_string(),
+                    label: "intent".to_string(),
+                }),
+                reason_codes: Some(ReasonCodes { codes: vec!["init".to_string()] }),
+                timestamp_ms: 1_700_002_000,
+                prev_event_digest: Some(Digest32 { value: vec![0x00; 32] }),
+                event_digest: Some(Digest32 { value: vec![0x10; 32] }),
+                attestation_sig: Some(Signature {
+                    algorithm: "ed25519".to_string(),
+                    signer: vec![0x01],
+                    signature: vec![0x02],
+                }),
+                epoch_id: 100,
+            },
+        ),
+        (
+            "sep_event_chain_2",
+            SepEvent {
+                event_id: "evt-2".to_string(),
+                session_id: "session-9000".to_string(),
+                event_type: SepEventType::EvDecision as i32,
+                object_ref: Some(Ref {
+                    uri: "decision://approval".to_string(),
+                    label: "decision".to_string(),
+                }),
+                reason_codes: Some(ReasonCodes { codes: vec!["policy".to_string()] }),
+                timestamp_ms: 1_700_002_500,
+                prev_event_digest: Some(Digest32 { value: vec![0x10; 32] }),
+                event_digest: Some(Digest32 { value: vec![0x20; 32] }),
+                attestation_sig: Some(Signature {
+                    algorithm: "ed25519".to_string(),
+                    signer: vec![0x03],
+                    signature: vec![0x04],
+                }),
+                epoch_id: 100,
+            },
+        ),
+        (
+            "sep_event_chain_3",
+            SepEvent {
+                event_id: "evt-3".to_string(),
+                session_id: "session-9000".to_string(),
+                event_type: SepEventType::EvOutcome as i32,
+                object_ref: Some(Ref {
+                    uri: "outcome://result".to_string(),
+                    label: "outcome".to_string(),
+                }),
+                reason_codes: Some(ReasonCodes { codes: vec!["success".to_string()] }),
+                timestamp_ms: 1_700_003_000,
+                prev_event_digest: Some(Digest32 { value: vec![0x20; 32] }),
+                event_digest: Some(Digest32 { value: vec![0x30; 32] }),
+                attestation_sig: Some(Signature {
+                    algorithm: "ed25519".to_string(),
+                    signer: vec![0x05],
+                    signature: vec![0x06],
+                }),
+                epoch_id: 101,
+            },
+        ),
+    ];
 
-    let expected = SepEvent {
-        session_id: "session-9000".to_string(),
-        event_id: "evt-1".to_string(),
-        phase: "plan".to_string(),
-        parents: parent_events,
-        payload: "kickoff".to_string(),
-        timestamp: 1_700_002_000,
-        summary: Some("Initial planning event".to_string()),
-    };
+    for (name, expected) in events {
+        verify_roundtrip(name, SEP_EVENT_SCHEMA, expected.clone())?;
+    }
 
-    verify_roundtrip("sep_event_chain", SEP_EVENT_SCHEMA, expected)
+    Ok(())
 }
 
 #[test]
 fn session_seal_roundtrip() -> Result<()> {
     let expected = SessionSeal {
+        seal_id: "seal-9000".to_string(),
+        seal_digest: Some(Digest32 { value: vec![0xAB; 32] }),
         session_id: "session-9000".to_string(),
-        record_digest: Some(Digest32 { value: vec![0xAB; 32] }),
-        signer: Some(Signature {
-            algorithm: "ed25519".to_string(),
-            signer: vec![0xAA, 0xBB, 0xCC],
-            signature: vec![0x01, 0x02, 0x03, 0x04],
+        final_event_digest: Some(Digest32 { value: vec![0x30; 32] }),
+        final_record_digest: Some(Digest32 { value: vec![0xCD; 32] }),
+        proof_receipt_ref: Some(Ref {
+            uri: "proof://session/receipt".to_string(),
+            label: "proof".to_string(),
         }),
-        sealed_at: 1_700_002_500,
-        summary: Some("Session closed".to_string()),
+        created_at_ms: 1_700_003_500,
     };
 
     verify_roundtrip("session_seal", SESSION_SEAL_SCHEMA, expected)
@@ -899,11 +1074,20 @@ fn session_seal_roundtrip() -> Result<()> {
 #[test]
 fn completeness_report_roundtrip() -> Result<()> {
     let expected = CompletenessReport {
+        report_id: "comp-01".to_string(),
+        report_digest: Some(Digest32 { value: vec![0xEF; 32] }),
         session_id: "session-9000".to_string(),
-        observed_events: 3,
-        expected_events: 3,
-        terminal: true,
-        summary: Some("All planned events observed".to_string()),
+        status: CompletenessStatus::CompFail as i32,
+        missing_nodes: vec![Ref {
+            uri: "sep://evt/missing".to_string(),
+            label: "missing".to_string(),
+        }],
+        missing_edges: vec!["evt-2->evt-4".to_string(), "evt-1->evt-3".to_string()],
+        reason_codes: Some(ReasonCodes { codes: sorted_strings(&["edge-gap", "missing-node"]) }),
+        proof_receipt_ref: Some(Ref {
+            uri: "proof://completeness/receipt".to_string(),
+            label: "proof".to_string(),
+        }),
     };
 
     verify_roundtrip("completeness_report", COMPLETENESS_REPORT_SCHEMA, expected)
