@@ -10,6 +10,9 @@ messages.
   sets (for example `ReasonCodes.codes`) MUST be sorted lexicographically before
   serialization. Such set-like lists SHOULD also be bounded by the caller to
   prevent unbounded growth when forming digests.
+* Reason codes that are carried directly (for example `ReasonCodes.codes`) or
+  wrapped (for example `TopReasonCodes.reason_codes`) MUST be sorted
+  lexicographically before computing canonical bytes or digests.
 * Canonical bytes are the deterministic protobuf encoding of the fully prepared
   message. The `canonical_bytes` helper in this crate performs the encoding; the
   caller is responsible for ordering any set-like repeated fields before

@@ -4,86 +4,45 @@ package ucf.v1;
 
 import "ucf/v1/common.proto";
 
-// Aggregated streaming signals emitted on a cadence.
-message SignalFrame {
-  // Identifier for the window (for example, epoch or rolling window label).
-  string window = 1;
-  // Policy evaluation statistics.
-  PolicyStats policy_stats = 2;
-  // Data loss prevention statistics.
-  DlpStats dlp_stats = 3;
-  // Executor/runtime statistics.
-  ExecStats exec_stats = 4;
-  // Budget consumption statistics.
-  BudgetStats budget_stats = 5;
-  // Receipt verification statistics.
-  ReceiptStats receipt_stats = 6;
-  // Human review and intervention statistics.
-  HumanStats human_stats = 7;
+enum WindowKind {
+  WINDOW_KIND_UNSPECIFIED = 0;
+  WINDOW_KIND_SHORT = 1;
+  WINDOW_KIND_MEDIUM = 2;
+  WINDOW_KIND_LONG = 3;
 }
 
-message PolicyStats {
-  uint64 evaluated = 1;
-  uint64 allowed = 2;
-  uint64 denied = 3;
-  uint64 deferred = 4;
+enum IntegrityState {
+  INTEGRITY_STATE_UNSPECIFIED = 0;
+  INTEGRITY_STATE_OK = 1;
+  INTEGRITY_STATE_DEGRADED = 2;
+  INTEGRITY_STATE_FAIL = 3;
 }
 
-message DlpStats {
-  uint64 scanned = 1;
-  uint64 flagged = 2;
-  uint64 blocked = 3;
+enum LevelClass {
+  LEVEL_CLASS_UNSPECIFIED = 0;
+  LEVEL_CLASS_LOW = 1;
+  LEVEL_CLASS_MED = 2;
+  LEVEL_CLASS_HIGH = 3;
 }
 
-message ExecStats {
-  uint64 runs_started = 1;
-  uint64 runs_completed = 2;
-  uint64 runs_failed = 3;
-  uint64 tokens_consumed = 4;
+enum ApprovalMode {
+  APPROVAL_MODE_UNSPECIFIED = 0;
+  APPROVAL_MODE_NORMAL = 1;
+  APPROVAL_MODE_STRICT = 2;
 }
 
-message BudgetStats {
-  uint64 consumed_tokens = 1;
-  uint64 remaining_tokens = 2;
-  uint64 overage_tokens = 3;
+enum CooldownClass {
+  COOLDOWN_CLASS_UNSPECIFIED = 0;
+  COOLDOWN_CLASS_BASE = 1;
+  COOLDOWN_CLASS_LONGER = 2;
 }
 
-message ReceiptStats {
-  uint64 accepted = 1;
-  uint64 rejected = 2;
-  uint64 errored = 3;
-}
-
-message HumanStats {
-  uint64 approvals_requested = 1;
-  uint64 approvals_granted = 2;
-  uint64 escalations = 3;
-  uint64 overrides = 4;
-}
-
-// Controls distributed alongside streaming signals.
-message ControlFrame {
-  string profile = 1;
-  OverlayControls overlays = 2;
-  repeated ToolClassMask toolclass_masks = 3;
-  ThresholdModifiers threshold_modifiers = 4;
-}
-
-message OverlayControls {
-  OverlayState state = 1;
-  bool watermark_enabled = 2;
-  bool audit_trail_enabled = 3;
-}
-
-enum OverlayState {
-  OVERLAY_STATE_UNSPECIFIED = 0;
-  OVERLAY_STATE_DISABLED = 1;
-  OVERLAY_STATE_ENABLED = 2;
-}
-
-message ToolClassMask {
-  ToolClass tool_class = 1;
-  MaskAction action = 2;
+enum ProfileState {
+  PROFILE_STATE_UNSPECIFIED = 0;
+  PROFILE_STATE_M0 = 1;
+  PROFILE_STATE_M1 = 2;
+  PROFILE_STATE_M2 = 3;
+  PROFILE_STATE_M3 = 4;
 }
 
 enum ToolClass {
@@ -94,22 +53,108 @@ enum ToolClass {
   TOOL_CLASS_STORAGE = 4;
 }
 
-enum MaskAction {
-  MASK_ACTION_UNSPECIFIED = 0;
-  MASK_ACTION_ALLOW = 1;
-  MASK_ACTION_DENY = 2;
-  MASK_ACTION_REQUIRE_HUMAN = 3;
+message WindowRef {
+  string window_id = 1;
+  WindowKind window_kind = 2;
+  uint64 epoch_id = 3;
+  Digest32 digest = 4;
+}
+
+message TopReasonCodes {
+  ReasonCodes reason_codes = 1;
+}
+
+message PolicyStats {
+  uint64 deny_count = 1;
+  uint64 allow_count = 2;
+  uint64 require_approval_count = 3;
+  uint64 require_simulation_count = 4;
+  TopReasonCodes top_reason_codes = 5;
+}
+
+message DlpStats {
+  uint64 dlp_block_count = 1;
+  uint64 dlp_redact_count = 2;
+  uint64 classify_upgrade_count = 3;
+  TopReasonCodes top_reason_codes = 4;
+}
+
+message ExecStats {
+  uint64 timeout_count = 1;
+  uint64 partial_failure_count = 2;
+  uint64 tool_unavailable_count = 3;
+  TopReasonCodes top_reason_codes = 4;
+}
+
+message BudgetStats {
+  uint64 near_exhaustion_count = 1;
+  uint64 chain_limit_hits = 2;
+  uint64 concurrency_limit_hits = 3;
+  TopReasonCodes top_reason_codes = 4;
+}
+
+message ReceiptStats {
+  uint64 receipt_missing_count = 1;
+  uint64 receipt_invalid_count = 2;
+  TopReasonCodes top_reason_codes = 3;
+}
+
+message HumanStats {
+  uint64 approval_denied_count = 1;
+  bool stop_invoked_flag = 2;
+  string recovery_stage = 3;
+}
+
+message ToolClassMask {
+  bool enable_read = 1;
+  bool enable_transform = 2;
+  bool enable_export = 3;
+  bool enable_write = 4;
+  bool enable_execute = 5;
+}
+
+message OverlaySet {
+  bool ovl_simulate_first = 1;
+  bool ovl_export_lock = 2;
+  bool ovl_novelty_lock = 3;
 }
 
 message ThresholdModifiers {
-  ThresholdBehavior safety = 1;
-  ThresholdBehavior privacy = 2;
-  ThresholdBehavior budget = 3;
+  ApprovalMode approval_mode = 1;
+  LevelClass novelty_tightening = 2;
+  LevelClass chain_tightening = 3;
+  LevelClass export_strictness_tightening = 4;
+  CooldownClass cooldown_class = 5;
 }
 
-enum ThresholdBehavior {
-  THRESHOLD_BEHAVIOR_UNSPECIFIED = 0;
-  THRESHOLD_BEHAVIOR_STRICTER = 1;
-  THRESHOLD_BEHAVIOR_RELAXED = 2;
-  THRESHOLD_BEHAVIOR_UNCHANGED = 3;
+message SignalFrame {
+  string signal_frame_id = 1;
+  Digest32 signal_frame_digest = 2;
+  uint64 epoch_id = 3;
+  uint64 timestamp_ms = 4;
+  WindowRef window = 5;
+  IntegrityState integrity_state = 6;
+  PolicyStats policy_stats = 7;
+  DlpStats dlp_stats = 8;
+  ExecStats exec_stats = 9;
+  BudgetStats budget_stats = 10;
+  HumanStats human_stats = 11;
+  ReceiptStats receipt_stats = 12;
+  ReasonCodes reason_codes = 13;
+}
+
+message ControlFrame {
+  string control_frame_id = 1;
+  Digest32 control_frame_digest = 2;
+  uint64 epoch_id = 3;
+  uint64 timestamp_ms = 4;
+  ProfileState active_profile = 5;
+  ReasonCodes profile_reason_codes = 6;
+  OverlaySet overlays = 7;
+  ThresholdModifiers threshold_modifiers = 8;
+  ToolClassMask toolclass_mask = 9;
+  bool deescalation_lock = 10;
+  string charter_version_digest = 11;
+  Digest32 character_epoch_digest = 12;
+  Digest32 prev_control_frame_digest = 13;
 }
