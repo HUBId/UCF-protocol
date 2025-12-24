@@ -75,6 +75,17 @@ fn load_fixture(name: &str) -> Result<(Vec<u8>, [u8; 32])> {
     Ok((bytes, digest))
 }
 
+fn load_binary_fixture(name: &str) -> Result<(Vec<u8>, [u8; 32])> {
+    let bytes = fs::read(format!("testvectors/{name}.bin"))
+        .with_context(|| format!("reading {name}.bin"))?;
+    let digest_hex = fs::read_to_string(format!("testvectors/{name}.digest"))
+        .with_context(|| format!("reading {name}.digest"))?;
+    let digest_vec = hex::decode(digest_hex.trim()).context("decoding digest hex")?;
+    let digest: [u8; 32] =
+        digest_vec.try_into().map_err(|_| anyhow::anyhow!("digest must be 32 bytes"))?;
+    Ok((bytes, digest))
+}
+
 fn verify_case<M>(name: &str, schema: &str, expected: M) -> Result<()>
 where
     M: Message + Default + Clone,
@@ -708,6 +719,34 @@ fn microcircuit_config_hpa_case() -> Result<()> {
         MICRO_CIRCUIT_DOMAIN,
         expected,
     )
+}
+
+#[test]
+fn microcircuit_config_hpa_bin_case() -> Result<()> {
+    let (fixture_bytes, fixture_digest) = load_binary_fixture("mc_cfg_hpa")?;
+
+    let decoded = MicrocircuitConfigEvidence::decode(fixture_bytes.as_slice())?;
+    let encoded = canonical_bytes(&decoded);
+    assert_eq!(fixture_bytes, encoded, "canonical bytes should be stable");
+
+    let digest = digest32(MICRO_CIRCUIT_DOMAIN, MICRO_CIRCUIT_SCHEMA, VERSION, &encoded);
+    assert_eq!(fixture_digest, digest, "digest should match stored fixture");
+
+    let expected = MicrocircuitConfigEvidence {
+        module: MicroModule::Hpa as i32,
+        config_version: 1,
+        config_digest: Some(Digest32 { value: vec![0x44; 32] }),
+        created_at_ms: 1_700_125_000,
+        prev_config_digest: None,
+        proof_receipt_ref: None,
+        attestation_sig: None,
+        attestation_key_id: None,
+    };
+
+    let expected_bytes = canonical_bytes(&expected);
+    assert_eq!(encoded, expected_bytes, "constructed and fixture differ");
+
+    Ok(())
 }
 
 fn meso_milestone_stable_case() -> Result<()> {
