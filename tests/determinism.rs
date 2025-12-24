@@ -687,6 +687,29 @@ fn microcircuit_config_sn_case() -> Result<()> {
     )
 }
 
+fn microcircuit_config_hpa_case() -> Result<()> {
+    let expected = MicrocircuitConfigEvidence {
+        module: MicroModule::Hpa as i32,
+        config_version: 1,
+        config_digest: Some(Digest32 { value: vec![0x33; 32] }),
+        created_at_ms: 1_700_124_111,
+        prev_config_digest: Some(Digest32 { value: vec![0x22; 32] }),
+        proof_receipt_ref: Some(Ref {
+            uri: "proof://microcircuit/config/receipt-hpa-1".to_string(),
+            label: "receipt".to_string(),
+        }),
+        attestation_sig: None,
+        attestation_key_id: Some("attest-key-hpa-1".to_string()),
+    };
+
+    verify_case_with_domain(
+        "microcircuit_config_hpa_v1",
+        MICRO_CIRCUIT_SCHEMA,
+        MICRO_CIRCUIT_DOMAIN,
+        expected,
+    )
+}
+
 fn meso_milestone_stable_case() -> Result<()> {
     let mut theme_tags = vec!["consolidation".to_string(), "stability".to_string()];
     theme_tags.sort();
@@ -1250,6 +1273,12 @@ const FIXTURE_CASES: &[FixtureCase] = &[
         schema: MICRO_MILESTONE_SCHEMA,
         proto_files: &["proto/ucf/v1/milestones.proto", "proto/ucf/v1/common.proto"],
         verify: micro_milestone_sealed_case,
+    },
+    FixtureCase {
+        name: "microcircuit_config_hpa_v1",
+        schema: MICRO_CIRCUIT_SCHEMA,
+        proto_files: &["proto/ucf/v1/microcircuit.proto", "proto/ucf/v1/common.proto"],
+        verify: microcircuit_config_hpa_case,
     },
     FixtureCase {
         name: "microcircuit_config_lc_v1",

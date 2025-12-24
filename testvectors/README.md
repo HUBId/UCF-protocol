@@ -22,6 +22,7 @@ The fixtures currently included are:
 | micro_milestone_sealed | `ucf-core` | `ucf.v1.MicroMilestone` | `1`     |
 | microcircuit_config_lc_v1 | `UCF:HASH:MC_CONFIG` | `ucf.v1.MicrocircuitConfigEvidence` | `1` |
 | microcircuit_config_sn_v1 | `UCF:HASH:MC_CONFIG` | `ucf.v1.MicrocircuitConfigEvidence` | `1` |
+| microcircuit_config_hpa_v1 | `UCF:HASH:MC_CONFIG` | `ucf.v1.MicrocircuitConfigEvidence` | `1` |
 | meso_milestone_stable | `ucf-core` | `ucf.v1.MesoMilestone` | `1`     |
 | macro_milestone_finalized | `ucf-core` | `ucf.v1.MacroMilestone` | `1`     |
 | replay_plan_high_fidelity | `ucf-core` | `ucf.v1.ReplayPlan` | `1`     |

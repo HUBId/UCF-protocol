@@ -8,7 +8,8 @@ enum MicroModule {
   MICRO_MODULE_UNSPECIFIED = 0;
   MICRO_MODULE_LC = 1;
   MICRO_MODULE_SN = 2;
-  // optional future additions: AMYGDALA, HPA, etc.
+  MICRO_MODULE_HPA = 3;
+  // optional future additions: AMYGDALA, etc.
 }
 
 message MicrocircuitConfigEvidence {
