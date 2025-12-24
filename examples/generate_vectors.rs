@@ -812,6 +812,27 @@ fn main() -> anyhow::Result<()> {
         &microcircuit_config_sn,
         microcircuit_domain,
     )?;
+
+    let microcircuit_config_hpa = MicrocircuitConfigEvidence {
+        module: MicroModule::Hpa as i32,
+        config_version: 1,
+        config_digest: Some(Digest32 { value: vec![0x33; 32] }),
+        created_at_ms: 1_700_124_111,
+        prev_config_digest: Some(Digest32 { value: vec![0x22; 32] }),
+        proof_receipt_ref: Some(Ref {
+            uri: "proof://microcircuit/config/receipt-hpa-1".to_string(),
+            label: "receipt".to_string(),
+        }),
+        attestation_sig: None,
+        attestation_key_id: Some("attest-key-hpa-1".to_string()),
+    };
+
+    emit_fixture(
+        "microcircuit_config_hpa_v1",
+        "ucf.v1.MicrocircuitConfigEvidence",
+        &microcircuit_config_hpa,
+        microcircuit_domain,
+    )?;
     emit_fixture(
         "tool_registry_container",
         "ucf.v1.ToolRegistryContainer",
