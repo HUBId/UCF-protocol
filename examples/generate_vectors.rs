@@ -26,6 +26,17 @@ fn write_fixture(name: &str, schema: &str, bytes: &[u8], domain: &str) -> anyhow
     Ok(())
 }
 
+fn write_bin_fixture(name: &str, schema: &str, bytes: &[u8], domain: &str) -> anyhow::Result<()> {
+    let digest = digest32(domain, schema, "1", bytes);
+    let bin_path = Path::new("testvectors").join(format!("{name}.bin"));
+    let digest_path = Path::new("testvectors").join(format!("{name}.digest"));
+    let mut digest_body = hex::encode(digest);
+    digest_body.push('\n');
+    fs::write(&bin_path, bytes)?;
+    fs::write(&digest_path, digest_body)?;
+    Ok(())
+}
+
 fn emit_fixture<M: Message>(
     name: &str,
     schema: &str,
@@ -34,6 +45,16 @@ fn emit_fixture<M: Message>(
 ) -> anyhow::Result<()> {
     let bytes = canonical_bytes(message);
     write_fixture(name, schema, &bytes, domain)
+}
+
+fn emit_bin_fixture<M: Message>(
+    name: &str,
+    schema: &str,
+    message: &M,
+    domain: &str,
+) -> anyhow::Result<()> {
+    let bytes = canonical_bytes(message);
+    write_bin_fixture(name, schema, &bytes, domain)
 }
 
 fn main() -> anyhow::Result<()> {
@@ -831,6 +852,24 @@ fn main() -> anyhow::Result<()> {
         "microcircuit_config_hpa_v1",
         "ucf.v1.MicrocircuitConfigEvidence",
         &microcircuit_config_hpa,
+        microcircuit_domain,
+    )?;
+
+    let microcircuit_config_hpa_bin = MicrocircuitConfigEvidence {
+        module: MicroModule::Hpa as i32,
+        config_version: 1,
+        config_digest: Some(Digest32 { value: vec![0x44; 32] }),
+        created_at_ms: 1_700_125_555,
+        prev_config_digest: None,
+        proof_receipt_ref: None,
+        attestation_sig: None,
+        attestation_key_id: None,
+    };
+
+    emit_bin_fixture(
+        "mc_cfg_hpa",
+        "ucf.v1.MicrocircuitConfigEvidence",
+        &microcircuit_config_hpa_bin,
         microcircuit_domain,
     )?;
     emit_fixture(
