@@ -75,6 +75,17 @@ fn load_fixture(name: &str) -> Result<(Vec<u8>, [u8; 32])> {
     Ok((bytes, digest))
 }
 
+fn load_bin_fixture(name: &str) -> Result<(Vec<u8>, [u8; 32])> {
+    let bytes = fs::read(format!("testvectors/{name}.bin"))
+        .with_context(|| format!("reading {name}.bin"))?;
+    let digest_hex = fs::read_to_string(format!("testvectors/{name}.digest"))
+        .with_context(|| format!("reading {name}.digest"))?;
+    let digest_vec = hex::decode(digest_hex.trim()).context("decoding digest hex")?;
+    let digest: [u8; 32] =
+        digest_vec.try_into().map_err(|_| anyhow::anyhow!("digest must be 32 bytes"))?;
+    Ok((bytes, digest))
+}
+
 fn verify_case<M>(name: &str, schema: &str, expected: M) -> Result<()>
 where
     M: Message + Default + Clone,
@@ -96,6 +107,25 @@ where
     assert_eq!(fixture_digest, digest, "digest should match stored fixture");
 
     // Regenerate bytes from an explicitly constructed message to ensure parity.
+    let constructed_bytes = canonical_bytes(&expected);
+    assert_eq!(encoded, constructed_bytes, "constructed and fixture differ");
+
+    Ok(())
+}
+
+fn verify_bin_case_with_domain<M>(name: &str, schema: &str, domain: &str, expected: M) -> Result<()>
+where
+    M: Message + Default + Clone,
+{
+    let (fixture_bytes, fixture_digest) = load_bin_fixture(name)?;
+
+    let decoded = M::decode(fixture_bytes.as_slice())?;
+    let encoded = canonical_bytes(&decoded);
+    assert_eq!(fixture_bytes, encoded, "canonical bytes should be stable");
+
+    let digest = digest32(domain, schema, VERSION, &encoded);
+    assert_eq!(fixture_digest, digest, "digest should match stored fixture");
+
     let constructed_bytes = canonical_bytes(&expected);
     assert_eq!(encoded, constructed_bytes, "constructed and fixture differ");
 
@@ -710,6 +740,21 @@ fn microcircuit_config_hpa_case() -> Result<()> {
     )
 }
 
+fn microcircuit_config_hpa_bin_case() -> Result<()> {
+    let expected = MicrocircuitConfigEvidence {
+        module: MicroModule::Hpa as i32,
+        config_version: 1,
+        config_digest: Some(Digest32 { value: vec![0x44; 32] }),
+        created_at_ms: 1_700_125_555,
+        prev_config_digest: None,
+        proof_receipt_ref: None,
+        attestation_sig: None,
+        attestation_key_id: None,
+    };
+
+    verify_bin_case_with_domain("mc_cfg_hpa", MICRO_CIRCUIT_SCHEMA, MICRO_CIRCUIT_DOMAIN, expected)
+}
+
 fn meso_milestone_stable_case() -> Result<()> {
     let mut theme_tags = vec!["consolidation".to_string(), "stability".to_string()];
     theme_tags.sort();
@@ -1261,6 +1306,12 @@ const FIXTURE_CASES: &[FixtureCase] = &[
         schema: MACRO_MILESTONE_SCHEMA,
         proto_files: &["proto/ucf/v1/milestones.proto", "proto/ucf/v1/common.proto"],
         verify: macro_milestone_finalized_case,
+    },
+    FixtureCase {
+        name: "mc_cfg_hpa",
+        schema: MICRO_CIRCUIT_SCHEMA,
+        proto_files: &["proto/ucf/v1/microcircuit.proto", "proto/ucf/v1/common.proto"],
+        verify: microcircuit_config_hpa_bin_case,
     },
     FixtureCase {
         name: "meso_milestone_stable",
