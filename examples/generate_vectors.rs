@@ -41,6 +41,9 @@ fn main() -> anyhow::Result<()> {
     let domain = "ucf-core";
     let microcircuit_domain = "UCF:HASH:MC_CONFIG";
     let asset_morph_domain = "UCF:ASSET:MORPH";
+    let asset_channel_params_domain = "UCF:ASSET:CHANNEL_PARAMS";
+    let asset_syn_params_domain = "UCF:ASSET:SYN_PARAMS";
+    let asset_connectivity_domain = "UCF:ASSET:CONNECTIVITY";
     let asset_manifest_domain = "UCF:ASSET:MANIFEST";
 
     let canonical_intent = CanonicalIntent {
@@ -137,6 +140,121 @@ fn main() -> anyhow::Result<()> {
             uri: "proof://assets/manifest/receipt-1".to_string(),
             label: "manifest-proof".to_string(),
         }),
+    };
+
+    let morphology_payload = MorphologySetPayload {
+        version: 1,
+        neurons: vec![
+            MorphNeuron {
+                neuron_id: 1,
+                compartments: vec![
+                    Compartment {
+                        comp_id: 1,
+                        parent: None,
+                        kind: CompartmentKind::Soma as i32,
+                        length_um: 20,
+                        diameter_um: 15,
+                    },
+                    Compartment {
+                        comp_id: 2,
+                        parent: Some(compartment::Parent::ParentCompId(1)),
+                        kind: CompartmentKind::Dendrite as i32,
+                        length_um: 120,
+                        diameter_um: 4,
+                    },
+                ],
+                labels: vec![
+                    LabelKv { k: "pool".to_string(), v: "alpha".to_string() },
+                    LabelKv { k: "type".to_string(), v: "pyramidal".to_string() },
+                ],
+            },
+            MorphNeuron {
+                neuron_id: 2,
+                compartments: vec![
+                    Compartment {
+                        comp_id: 1,
+                        parent: None,
+                        kind: CompartmentKind::Soma as i32,
+                        length_um: 18,
+                        diameter_um: 12,
+                    },
+                    Compartment {
+                        comp_id: 3,
+                        parent: Some(compartment::Parent::ParentCompId(1)),
+                        kind: CompartmentKind::Axon as i32,
+                        length_um: 200,
+                        diameter_um: 2,
+                    },
+                ],
+                labels: vec![LabelKv { k: "pool".to_string(), v: "beta".to_string() }],
+            },
+        ],
+        payload_digest: Some(Digest32 { value: vec![0xAB; 32] }),
+    };
+
+    let channel_params_payload = ChannelParamsSetPayload {
+        version: 1,
+        params: vec![
+            ChannelParams {
+                neuron_id: 1,
+                comp_id: 1,
+                leak_g: 1000,
+                na_g: 2000,
+                k_g: 1500,
+                ca_g: Some(800),
+                e_rev_leak: Some(-65),
+            },
+            ChannelParams {
+                neuron_id: 2,
+                comp_id: 1,
+                leak_g: 900,
+                na_g: 1800,
+                k_g: 1400,
+                ca_g: None,
+                e_rev_leak: None,
+            },
+        ],
+        payload_digest: Some(Digest32 { value: vec![0xBC; 32] }),
+    };
+
+    let synapse_params_payload = SynapseParamsSetPayload {
+        version: 1,
+        params: vec![
+            SynapseParams {
+                syn_param_id: 10,
+                syn_type: SynType::Exc as i32,
+                syn_kind: SynKind::Ampa as i32,
+                g_max_q: 65_536,
+                e_rev_mv: 0,
+                tau_decay_steps: 50,
+                stp_u_q: 32_768,
+                tau_rec_steps: 200,
+                tau_fac_steps: 100,
+                mod_channel: ModChannel::Na as i32,
+            },
+            SynapseParams {
+                syn_param_id: 11,
+                syn_type: SynType::Inh as i32,
+                syn_kind: SynKind::Gaba as i32,
+                g_max_q: 32_768,
+                e_rev_mv: -70,
+                tau_decay_steps: 60,
+                stp_u_q: 16_384,
+                tau_rec_steps: 150,
+                tau_fac_steps: 80,
+                mod_channel: ModChannel::None as i32,
+            },
+        ],
+        payload_digest: Some(Digest32 { value: vec![0xCD; 32] }),
+    };
+
+    let connectivity_payload = ConnectivityGraphPayload {
+        version: 1,
+        edges: vec![
+            ConnEdge { pre: 1, post: 2, post_compartment: 1, syn_param_id: 10, delay_steps: 2 },
+            ConnEdge { pre: 1, post: 3, post_compartment: 1, syn_param_id: 11, delay_steps: 3 },
+        ],
+        payload_digest: Some(Digest32 { value: vec![0xDE; 32] }),
     };
 
     let signal_frame = SignalFrame {
@@ -818,6 +936,30 @@ fn main() -> anyhow::Result<()> {
         "ucf.v1.AssetManifest",
         &asset_manifest,
         asset_manifest_domain,
+    )?;
+    emit_fixture(
+        "biophys_morphology_set_v1",
+        "ucf.v1.MorphologySetPayload",
+        &morphology_payload,
+        asset_morph_domain,
+    )?;
+    emit_fixture(
+        "biophys_channel_params_set_v1",
+        "ucf.v1.ChannelParamsSetPayload",
+        &channel_params_payload,
+        asset_channel_params_domain,
+    )?;
+    emit_fixture(
+        "biophys_synapse_params_set_v1",
+        "ucf.v1.SynapseParamsSetPayload",
+        &synapse_params_payload,
+        asset_syn_params_domain,
+    )?;
+    emit_fixture(
+        "biophys_connectivity_graph_v1",
+        "ucf.v1.ConnectivityGraphPayload",
+        &connectivity_payload,
+        asset_connectivity_domain,
     )?;
     emit_fixture("signal_frame_short_window", "ucf.v1.SignalFrame", &signal_frame, domain)?;
     emit_fixture("control_frame_m1_overlays_on", "ucf.v1.ControlFrame", &control_frame, domain)?;
