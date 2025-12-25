@@ -11,6 +11,8 @@ The fixtures currently included are:
 
 | Name                   | Domain       | Schema                   | Version |
 | ---------------------- | ------------ | ------------------------ | ------- |
+| asset_digest_morphology_v1 | `UCF:ASSET:MORPH` | `ucf.v1.AssetDigest` | `1` |
+| asset_manifest_v1 | `UCF:ASSET:MANIFEST` | `ucf.v1.AssetManifest` | `1` |
 | canonical_intent_query | `ucf-core`   | `ucf.v1.CanonicalIntent` | `1`     |
 | policy_decision        | `ucf-core`   | `ucf.v1.PolicyDecision`  | `1`     |
 | pvgs_receipt           | `ucf-core`   | `ucf.v1.PVGSReceipt`     | `1`     |

@@ -10,6 +10,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "proto/ucf/v1/human.proto",
         "proto/ucf/v1/policy.proto",
         "proto/ucf/v1/pvgs.proto",
+        "proto/ucf/v1/assets.proto",
         "proto/ucf/v1/frames.proto",
         "proto/ucf/v1/experience.proto",
         "proto/ucf/v1/milestones.proto",

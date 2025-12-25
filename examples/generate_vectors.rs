@@ -40,6 +40,8 @@ fn main() -> anyhow::Result<()> {
     fs::create_dir_all("testvectors")?;
     let domain = "ucf-core";
     let microcircuit_domain = "UCF:HASH:MC_CONFIG";
+    let asset_morph_domain = "UCF:ASSET:MORPH";
+    let asset_manifest_domain = "UCF:ASSET:MANIFEST";
 
     let canonical_intent = CanonicalIntent {
         intent_id: "intent-123".to_string(),
@@ -73,6 +75,67 @@ fn main() -> anyhow::Result<()> {
             algorithm: "ed25519".to_string(),
             signer: vec![0x01, 0x02, 0x03, 0x04],
             signature: vec![0x05, 0x06, 0x07, 0x08],
+        }),
+    };
+
+    let asset_digest_morphology = AssetDigest {
+        kind: AssetKind::MorphologySet as i32,
+        version: 1,
+        digest: Some(Digest32 { value: vec![0x10; 32] }),
+        created_at_ms: 1_700_100_123,
+        prev_digest: Some(Digest32 { value: vec![0x20; 32] }),
+        proof_receipt_ref: Some(Ref {
+            uri: "proof://assets/morphology/receipt-1".to_string(),
+            label: "morphology-proof".to_string(),
+        }),
+    };
+
+    let asset_morphology = AssetDigest {
+        kind: AssetKind::MorphologySet as i32,
+        version: 1,
+        digest: Some(Digest32 { value: vec![0x01; 32] }),
+        created_at_ms: 1_700_100_500,
+        prev_digest: None,
+        proof_receipt_ref: None,
+    };
+    let asset_channel_params = AssetDigest {
+        kind: AssetKind::ChannelParamsSet as i32,
+        version: 2,
+        digest: Some(Digest32 { value: vec![0x02; 32] }),
+        created_at_ms: 1_700_100_600,
+        prev_digest: Some(Digest32 { value: vec![0x12; 32] }),
+        proof_receipt_ref: None,
+    };
+    let asset_synapse_params = AssetDigest {
+        kind: AssetKind::SynapseParamsSet as i32,
+        version: 3,
+        digest: Some(Digest32 { value: vec![0x03; 32] }),
+        created_at_ms: 1_700_100_700,
+        prev_digest: None,
+        proof_receipt_ref: Some(Ref {
+            uri: "proof://assets/synapse/receipt-9".to_string(),
+            label: "synapse-proof".to_string(),
+        }),
+    };
+    let asset_connectivity = AssetDigest {
+        kind: AssetKind::ConnectivityGraph as i32,
+        version: 4,
+        digest: Some(Digest32 { value: vec![0x04; 32] }),
+        created_at_ms: 1_700_100_800,
+        prev_digest: Some(Digest32 { value: vec![0x14; 32] }),
+        proof_receipt_ref: None,
+    };
+    let asset_manifest = AssetManifest {
+        manifest_version: 1,
+        manifest_digest: Some(Digest32 { value: vec![0x99; 32] }),
+        morphology: Some(asset_morphology),
+        channel_params: Some(asset_channel_params),
+        synapse_params: Some(asset_synapse_params),
+        connectivity: Some(asset_connectivity),
+        created_at_ms: 1_700_100_900,
+        proof_receipt_ref: Some(Ref {
+            uri: "proof://assets/manifest/receipt-1".to_string(),
+            label: "manifest-proof".to_string(),
         }),
     };
 
@@ -744,6 +807,18 @@ fn main() -> anyhow::Result<()> {
     emit_fixture("canonical_intent_query", "ucf.v1.CanonicalIntent", &canonical_intent, domain)?;
     emit_fixture("policy_decision", "ucf.v1.PolicyDecision", &policy_decision, domain)?;
     emit_fixture("pvgs_receipt", "ucf.v1.PVGSReceipt", &pvgs_receipt, domain)?;
+    emit_fixture(
+        "asset_digest_morphology_v1",
+        "ucf.v1.AssetDigest",
+        &asset_digest_morphology,
+        asset_morph_domain,
+    )?;
+    emit_fixture(
+        "asset_manifest_v1",
+        "ucf.v1.AssetManifest",
+        &asset_manifest,
+        asset_manifest_domain,
+    )?;
     emit_fixture("signal_frame_short_window", "ucf.v1.SignalFrame", &signal_frame, domain)?;
     emit_fixture("control_frame_m1_overlays_on", "ucf.v1.ControlFrame", &control_frame, domain)?;
     emit_fixture(
