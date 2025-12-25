@@ -33,9 +33,16 @@ const REASON_CODES_SCHEMA: &str = "ucf.v1.ReasonCodes";
 const MICRO_CIRCUIT_SCHEMA: &str = "ucf.v1.MicrocircuitConfigEvidence";
 const ASSET_DIGEST_SCHEMA: &str = "ucf.v1.AssetDigest";
 const ASSET_MANIFEST_SCHEMA: &str = "ucf.v1.AssetManifest";
+const MORPHOLOGY_SET_SCHEMA: &str = "ucf.v1.MorphologySetPayload";
+const CHANNEL_PARAMS_SET_SCHEMA: &str = "ucf.v1.ChannelParamsSetPayload";
+const SYNAPSE_PARAMS_SET_SCHEMA: &str = "ucf.v1.SynapseParamsSetPayload";
+const CONNECTIVITY_GRAPH_SCHEMA: &str = "ucf.v1.ConnectivityGraphPayload";
 const VERSION: &str = "1";
 const MICRO_CIRCUIT_DOMAIN: &str = "UCF:HASH:MC_CONFIG";
 const ASSET_MORPHOLOGY_DOMAIN: &str = "UCF:ASSET:MORPH";
+const ASSET_CHANNEL_PARAMS_DOMAIN: &str = "UCF:ASSET:CHANNEL_PARAMS";
+const ASSET_SYN_PARAMS_DOMAIN: &str = "UCF:ASSET:SYN_PARAMS";
+const ASSET_CONNECTIVITY_DOMAIN: &str = "UCF:ASSET:CONNECTIVITY";
 const ASSET_MANIFEST_DOMAIN: &str = "UCF:ASSET:MANIFEST";
 
 struct FixtureCase {
@@ -54,6 +61,7 @@ const PROTO_FILES: &[&str] = &[
     "proto/ucf/v1/policy.proto",
     "proto/ucf/v1/pvgs.proto",
     "proto/ucf/v1/assets.proto",
+    "proto/ucf/v1/biophys_assets.proto",
     "proto/ucf/v1/frames.proto",
     "proto/ucf/v1/experience.proto",
     "proto/ucf/v1/milestones.proto",
@@ -265,6 +273,158 @@ fn asset_manifest_case() -> Result<()> {
         "asset_manifest_v1",
         ASSET_MANIFEST_SCHEMA,
         ASSET_MANIFEST_DOMAIN,
+        expected,
+    )
+}
+
+fn biophys_morphology_set_case() -> Result<()> {
+    let neuron_one = MorphNeuron {
+        neuron_id: 1,
+        compartments: vec![
+            Compartment {
+                comp_id: 1,
+                parent: None,
+                kind: CompartmentKind::Soma as i32,
+                length_um: 20,
+                diameter_um: 15,
+            },
+            Compartment {
+                comp_id: 2,
+                parent: Some(compartment::Parent::ParentCompId(1)),
+                kind: CompartmentKind::Dendrite as i32,
+                length_um: 120,
+                diameter_um: 4,
+            },
+        ],
+        labels: vec![
+            LabelKv { k: "pool".to_string(), v: "alpha".to_string() },
+            LabelKv { k: "type".to_string(), v: "pyramidal".to_string() },
+        ],
+    };
+
+    let neuron_two = MorphNeuron {
+        neuron_id: 2,
+        compartments: vec![
+            Compartment {
+                comp_id: 1,
+                parent: None,
+                kind: CompartmentKind::Soma as i32,
+                length_um: 18,
+                diameter_um: 12,
+            },
+            Compartment {
+                comp_id: 3,
+                parent: Some(compartment::Parent::ParentCompId(1)),
+                kind: CompartmentKind::Axon as i32,
+                length_um: 200,
+                diameter_um: 2,
+            },
+        ],
+        labels: vec![LabelKv { k: "pool".to_string(), v: "beta".to_string() }],
+    };
+
+    let expected = MorphologySetPayload {
+        version: 1,
+        neurons: vec![neuron_one, neuron_two],
+        payload_digest: Some(Digest32 { value: vec![0xAB; 32] }),
+    };
+
+    verify_case_with_domain(
+        "biophys_morphology_set_v1",
+        MORPHOLOGY_SET_SCHEMA,
+        ASSET_MORPHOLOGY_DOMAIN,
+        expected,
+    )
+}
+
+fn biophys_channel_params_set_case() -> Result<()> {
+    let expected = ChannelParamsSetPayload {
+        version: 1,
+        params: vec![
+            ChannelParams {
+                neuron_id: 1,
+                comp_id: 1,
+                leak_g: 1000,
+                na_g: 2000,
+                k_g: 1500,
+                ca_g: Some(800),
+                e_rev_leak: Some(-65),
+            },
+            ChannelParams {
+                neuron_id: 2,
+                comp_id: 1,
+                leak_g: 900,
+                na_g: 1800,
+                k_g: 1400,
+                ca_g: None,
+                e_rev_leak: None,
+            },
+        ],
+        payload_digest: Some(Digest32 { value: vec![0xBC; 32] }),
+    };
+
+    verify_case_with_domain(
+        "biophys_channel_params_set_v1",
+        CHANNEL_PARAMS_SET_SCHEMA,
+        ASSET_CHANNEL_PARAMS_DOMAIN,
+        expected,
+    )
+}
+
+fn biophys_synapse_params_set_case() -> Result<()> {
+    let expected = SynapseParamsSetPayload {
+        version: 1,
+        params: vec![
+            SynapseParams {
+                syn_param_id: 10,
+                syn_type: SynType::Exc as i32,
+                syn_kind: SynKind::Ampa as i32,
+                g_max_q: 65_536,
+                e_rev_mv: 0,
+                tau_decay_steps: 50,
+                stp_u_q: 32_768,
+                tau_rec_steps: 200,
+                tau_fac_steps: 100,
+                mod_channel: ModChannel::Na as i32,
+            },
+            SynapseParams {
+                syn_param_id: 11,
+                syn_type: SynType::Inh as i32,
+                syn_kind: SynKind::Gaba as i32,
+                g_max_q: 32_768,
+                e_rev_mv: -70,
+                tau_decay_steps: 60,
+                stp_u_q: 16_384,
+                tau_rec_steps: 150,
+                tau_fac_steps: 80,
+                mod_channel: ModChannel::None as i32,
+            },
+        ],
+        payload_digest: Some(Digest32 { value: vec![0xCD; 32] }),
+    };
+
+    verify_case_with_domain(
+        "biophys_synapse_params_set_v1",
+        SYNAPSE_PARAMS_SET_SCHEMA,
+        ASSET_SYN_PARAMS_DOMAIN,
+        expected,
+    )
+}
+
+fn biophys_connectivity_graph_case() -> Result<()> {
+    let expected = ConnectivityGraphPayload {
+        version: 1,
+        edges: vec![
+            ConnEdge { pre: 1, post: 2, post_compartment: 1, syn_param_id: 10, delay_steps: 2 },
+            ConnEdge { pre: 1, post: 3, post_compartment: 1, syn_param_id: 11, delay_steps: 3 },
+        ],
+        payload_digest: Some(Digest32 { value: vec![0xDE; 32] }),
+    };
+
+    verify_case_with_domain(
+        "biophys_connectivity_graph_v1",
+        CONNECTIVITY_GRAPH_SCHEMA,
+        ASSET_CONNECTIVITY_DOMAIN,
         expected,
     )
 }
@@ -1348,6 +1508,30 @@ const FIXTURE_CASES: &[FixtureCase] = &[
         schema: ASSET_MANIFEST_SCHEMA,
         proto_files: &["proto/ucf/v1/assets.proto", "proto/ucf/v1/common.proto"],
         verify: asset_manifest_case,
+    },
+    FixtureCase {
+        name: "biophys_channel_params_set_v1",
+        schema: CHANNEL_PARAMS_SET_SCHEMA,
+        proto_files: &["proto/ucf/v1/biophys_assets.proto", "proto/ucf/v1/common.proto"],
+        verify: biophys_channel_params_set_case,
+    },
+    FixtureCase {
+        name: "biophys_connectivity_graph_v1",
+        schema: CONNECTIVITY_GRAPH_SCHEMA,
+        proto_files: &["proto/ucf/v1/biophys_assets.proto", "proto/ucf/v1/common.proto"],
+        verify: biophys_connectivity_graph_case,
+    },
+    FixtureCase {
+        name: "biophys_morphology_set_v1",
+        schema: MORPHOLOGY_SET_SCHEMA,
+        proto_files: &["proto/ucf/v1/biophys_assets.proto", "proto/ucf/v1/common.proto"],
+        verify: biophys_morphology_set_case,
+    },
+    FixtureCase {
+        name: "biophys_synapse_params_set_v1",
+        schema: SYNAPSE_PARAMS_SET_SCHEMA,
+        proto_files: &["proto/ucf/v1/biophys_assets.proto", "proto/ucf/v1/common.proto"],
+        verify: biophys_synapse_params_set_case,
     },
     FixtureCase {
         name: "canonical_intent_query",

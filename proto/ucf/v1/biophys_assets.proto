@@ -1,0 +1,129 @@
+syntax = "proto3";
+
+package ucf.v1;
+
+import "ucf/v1/common.proto";
+
+// Determinism notes:
+// - Producing chips must sort neurons by neuron_id.
+// - Producing chips must sort compartments by comp_id.
+// - Producing chips must sort labels by (k, v).
+// - Producing chips must sort synapse params by syn_param_id.
+// - Producing chips must sort edges by (pre, post, post_compartment, syn_param_id, delay_steps).
+
+enum CompartmentKind {
+  COMPARTMENT_KIND_UNSPECIFIED = 0;
+  SOMA = 1;
+  DENDRITE = 2;
+  AXON = 3;
+}
+
+enum SynType {
+  SYN_TYPE_UNSPECIFIED = 0;
+  EXC = 1;
+  INH = 2;
+}
+
+enum ModChannel {
+  MOD_CHANNEL_UNSPECIFIED = 0;
+  NONE = 1;
+  NA = 2;
+  DA = 3;
+  HT = 4;
+  NA_DA = 5;
+  HT_NA = 6;
+}
+
+enum SynKind {
+  SYN_KIND_UNSPECIFIED = 0;
+  AMPA = 1;
+  NMDA = 2;
+  GABA = 3;
+}
+
+message LabelKV {
+  string k = 1;
+  string v = 2;
+}
+
+message Compartment {
+  uint32 comp_id = 1;
+  oneof parent {
+    // Unset means no parent compartment.
+    uint32 parent_comp_id = 2;
+  }
+  CompartmentKind kind = 3;
+  uint32 length_um = 4;
+  uint32 diameter_um = 5;
+}
+
+message MorphNeuron {
+  uint32 neuron_id = 1;
+  // Bounded list (enforced in chips).
+  repeated Compartment compartments = 2;
+  // Bounded list (enforced in chips).
+  repeated LabelKV labels = 3;
+}
+
+message MorphologySetPayload {
+  uint32 version = 1;
+  // Bounded list (enforced in chips).
+  repeated MorphNeuron neurons = 2;
+  // Optional, can be computed outside the payload.
+  optional Digest32 payload_digest = 3;
+}
+
+message ChannelParams {
+  uint32 neuron_id = 1;
+  uint32 comp_id = 2;
+  uint32 leak_g = 3;
+  uint32 na_g = 4;
+  uint32 k_g = 5;
+  optional uint32 ca_g = 6;
+  optional int32 e_rev_leak = 7;
+}
+
+message ChannelParamsSetPayload {
+  uint32 version = 1;
+  // Bounded list (enforced in chips).
+  repeated ChannelParams params = 2;
+  // Optional, can be computed outside the payload.
+  optional Digest32 payload_digest = 3;
+}
+
+message SynapseParams {
+  uint32 syn_param_id = 1;
+  SynType syn_type = 2;
+  SynKind syn_kind = 3;
+  uint32 g_max_q = 4;
+  int32 e_rev_mv = 5;
+  uint32 tau_decay_steps = 6;
+  uint32 stp_u_q = 7;
+  uint32 tau_rec_steps = 8;
+  uint32 tau_fac_steps = 9;
+  ModChannel mod_channel = 10;
+}
+
+message SynapseParamsSetPayload {
+  uint32 version = 1;
+  // Bounded list (enforced in chips).
+  repeated SynapseParams params = 2;
+  // Optional, can be computed outside the payload.
+  optional Digest32 payload_digest = 3;
+}
+
+message ConnEdge {
+  uint32 pre = 1;
+  uint32 post = 2;
+  uint32 post_compartment = 3;
+  uint32 syn_param_id = 4;
+  uint32 delay_steps = 5;
+}
+
+message ConnectivityGraphPayload {
+  uint32 version = 1;
+  // Bounded list (enforced in chips).
+  repeated ConnEdge edges = 2;
+  // Optional, can be computed outside the payload.
+  optional Digest32 payload_digest = 3;
+}

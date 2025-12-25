@@ -10,7 +10,11 @@ pub mod ucf {
     }
 }
 
-pub use ucf::v1::{AssetDigest, AssetKind, AssetManifest};
+pub use ucf::v1::{
+    AssetDigest, AssetKind, AssetManifest, ChannelParams, ChannelParamsSetPayload, Compartment,
+    CompartmentKind, ConnEdge, ConnectivityGraphPayload, LabelKv, ModChannel, MorphNeuron,
+    MorphologySetPayload, SynKind, SynType, SynapseParams, SynapseParamsSetPayload,
+};
 
 /// Canonically encode a protobuf message using deterministic field ordering.
 ///
