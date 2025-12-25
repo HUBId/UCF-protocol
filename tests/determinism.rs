@@ -31,8 +31,12 @@ const COMPLETENESS_REPORT_SCHEMA: &str = "ucf.v1.CompletenessReport";
 const UCF_ENVELOPE_SCHEMA: &str = "ucf.v1.UcfEnvelope";
 const REASON_CODES_SCHEMA: &str = "ucf.v1.ReasonCodes";
 const MICRO_CIRCUIT_SCHEMA: &str = "ucf.v1.MicrocircuitConfigEvidence";
+const ASSET_DIGEST_SCHEMA: &str = "ucf.v1.AssetDigest";
+const ASSET_MANIFEST_SCHEMA: &str = "ucf.v1.AssetManifest";
 const VERSION: &str = "1";
 const MICRO_CIRCUIT_DOMAIN: &str = "UCF:HASH:MC_CONFIG";
+const ASSET_MORPHOLOGY_DOMAIN: &str = "UCF:ASSET:MORPH";
+const ASSET_MANIFEST_DOMAIN: &str = "UCF:ASSET:MANIFEST";
 
 struct FixtureCase {
     name: &'static str,
@@ -49,6 +53,7 @@ const PROTO_FILES: &[&str] = &[
     "proto/ucf/v1/human.proto",
     "proto/ucf/v1/policy.proto",
     "proto/ucf/v1/pvgs.proto",
+    "proto/ucf/v1/assets.proto",
     "proto/ucf/v1/frames.proto",
     "proto/ucf/v1/experience.proto",
     "proto/ucf/v1/milestones.proto",
@@ -183,6 +188,85 @@ fn pvgs_receipt_fixture_case() -> Result<()> {
     };
 
     verify_case("pvgs_receipt", PVGS_SCHEMA, expected)
+}
+
+fn asset_digest_morphology_case() -> Result<()> {
+    let expected = AssetDigest {
+        kind: AssetKind::MorphologySet as i32,
+        version: 1,
+        digest: Some(Digest32 { value: vec![0x10; 32] }),
+        created_at_ms: 1_700_100_123,
+        prev_digest: Some(Digest32 { value: vec![0x20; 32] }),
+        proof_receipt_ref: Some(Ref {
+            uri: "proof://assets/morphology/receipt-1".to_string(),
+            label: "morphology-proof".to_string(),
+        }),
+    };
+
+    verify_case_with_domain(
+        "asset_digest_morphology_v1",
+        ASSET_DIGEST_SCHEMA,
+        ASSET_MORPHOLOGY_DOMAIN,
+        expected,
+    )
+}
+
+fn asset_manifest_case() -> Result<()> {
+    let morphology = AssetDigest {
+        kind: AssetKind::MorphologySet as i32,
+        version: 1,
+        digest: Some(Digest32 { value: vec![0x01; 32] }),
+        created_at_ms: 1_700_100_500,
+        prev_digest: None,
+        proof_receipt_ref: None,
+    };
+    let channel_params = AssetDigest {
+        kind: AssetKind::ChannelParamsSet as i32,
+        version: 2,
+        digest: Some(Digest32 { value: vec![0x02; 32] }),
+        created_at_ms: 1_700_100_600,
+        prev_digest: Some(Digest32 { value: vec![0x12; 32] }),
+        proof_receipt_ref: None,
+    };
+    let synapse_params = AssetDigest {
+        kind: AssetKind::SynapseParamsSet as i32,
+        version: 3,
+        digest: Some(Digest32 { value: vec![0x03; 32] }),
+        created_at_ms: 1_700_100_700,
+        prev_digest: None,
+        proof_receipt_ref: Some(Ref {
+            uri: "proof://assets/synapse/receipt-9".to_string(),
+            label: "synapse-proof".to_string(),
+        }),
+    };
+    let connectivity = AssetDigest {
+        kind: AssetKind::ConnectivityGraph as i32,
+        version: 4,
+        digest: Some(Digest32 { value: vec![0x04; 32] }),
+        created_at_ms: 1_700_100_800,
+        prev_digest: Some(Digest32 { value: vec![0x14; 32] }),
+        proof_receipt_ref: None,
+    };
+    let expected = AssetManifest {
+        manifest_version: 1,
+        manifest_digest: Some(Digest32 { value: vec![0x99; 32] }),
+        morphology: Some(morphology),
+        channel_params: Some(channel_params),
+        synapse_params: Some(synapse_params),
+        connectivity: Some(connectivity),
+        created_at_ms: 1_700_100_900,
+        proof_receipt_ref: Some(Ref {
+            uri: "proof://assets/manifest/receipt-1".to_string(),
+            label: "manifest-proof".to_string(),
+        }),
+    };
+
+    verify_case_with_domain(
+        "asset_manifest_v1",
+        ASSET_MANIFEST_SCHEMA,
+        ASSET_MANIFEST_DOMAIN,
+        expected,
+    )
 }
 
 fn signal_frame_fixture_case() -> Result<()> {
@@ -1252,6 +1336,18 @@ const FIXTURE_CASES: &[FixtureCase] = &[
         schema: APPROVAL_DECISION_SCHEMA,
         proto_files: &["proto/ucf/v1/human.proto", "proto/ucf/v1/common.proto"],
         verify: approval_decision_case,
+    },
+    FixtureCase {
+        name: "asset_digest_morphology_v1",
+        schema: ASSET_DIGEST_SCHEMA,
+        proto_files: &["proto/ucf/v1/assets.proto", "proto/ucf/v1/common.proto"],
+        verify: asset_digest_morphology_case,
+    },
+    FixtureCase {
+        name: "asset_manifest_v1",
+        schema: ASSET_MANIFEST_SCHEMA,
+        proto_files: &["proto/ucf/v1/assets.proto", "proto/ucf/v1/common.proto"],
+        verify: asset_manifest_case,
     },
     FixtureCase {
         name: "canonical_intent_query",

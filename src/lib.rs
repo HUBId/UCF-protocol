@@ -10,6 +10,8 @@ pub mod ucf {
     }
 }
 
+pub use ucf::v1::{AssetDigest, AssetKind, AssetManifest};
+
 /// Canonically encode a protobuf message using deterministic field ordering.
 ///
 /// The caller is responsible for ordering any repeated fields that should be

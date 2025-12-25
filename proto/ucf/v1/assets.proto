@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package ucf.v1;
+
+import "ucf/v1/common.proto";
+
+// Domain separation strings for asset digests:
+// "UCF:ASSET:MORPH"
+// "UCF:ASSET:CHANNEL_PARAMS"
+// "UCF:ASSET:SYN_PARAMS"
+// "UCF:ASSET:CONNECTIVITY"
+// "UCF:ASSET:MANIFEST"
+
+enum AssetKind {
+  ASSET_KIND_UNSPECIFIED = 0;
+  MORPHOLOGY_SET = 1;
+  CHANNEL_PARAMS_SET = 2;
+  SYNAPSE_PARAMS_SET = 3;
+  CONNECTIVITY_GRAPH = 4;
+  ASSET_MANIFEST = 5;
+}
+
+message AssetDigest {
+  AssetKind kind = 1;
+  uint32 version = 2;
+  Digest32 digest = 3;
+  uint64 created_at_ms = 4;
+  optional Digest32 prev_digest = 5;
+  optional Ref proof_receipt_ref = 6;
+}
+
+message AssetManifest {
+  uint32 manifest_version = 1;
+  Digest32 manifest_digest = 2;
+  AssetDigest morphology = 3;
+  AssetDigest channel_params = 4;
+  AssetDigest synapse_params = 5;
+  AssetDigest connectivity = 6;
+  uint64 created_at_ms = 7;
+  optional Ref proof_receipt_ref = 8;
+}
