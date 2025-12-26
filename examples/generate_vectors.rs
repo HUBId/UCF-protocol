@@ -594,6 +594,34 @@ fn main() -> anyhow::Result<()> {
             label: "vrf".to_string(),
         }),
         proof_receipt_ref: None,
+        asset_manifest_ref: None,
+    };
+
+    let replay_plan_asset_manifest = ReplayPlan {
+        replay_id: "replay-asset-manifest".to_string(),
+        replay_digest: Some(Digest32 { value: vec![0x45; 32] }),
+        trigger_reason_codes: Some(ReasonCodes { codes: sorted_strings(&["asset-refresh"]) }),
+        target_refs: {
+            let mut refs = vec![Ref {
+                uri: "ucf://macro/asset-refresh".to_string(),
+                label: "macro-asset-refresh".to_string(),
+            }];
+            refs.sort_by(|a, b| a.uri.cmp(&b.uri));
+            refs
+        },
+        fidelity: ReplayFidelity::ReplayMed as i32,
+        inject_mode: ReplayInjectMode::InjectReportOnly as i32,
+        stop_conditions: Some(StopConditions {
+            max_steps_class: 2,
+            max_budget_class: 1,
+            stop_on_dlp_flag: false,
+        }),
+        vrf_digest_ref: None,
+        proof_receipt_ref: None,
+        asset_manifest_ref: Some(Ref {
+            uri: "asset_manifest".to_string(),
+            label: "manifest-digest".to_string(),
+        }),
     };
 
     let consistency_feedback = ConsistencyFeedback {
@@ -980,6 +1008,12 @@ fn main() -> anyhow::Result<()> {
     emit_fixture("meso_milestone_stable", "ucf.v1.MesoMilestone", &meso_milestone, domain)?;
     emit_fixture("macro_milestone_finalized", "ucf.v1.MacroMilestone", &macro_milestone, domain)?;
     emit_fixture("replay_plan_high_fidelity", "ucf.v1.ReplayPlan", &replay_plan, domain)?;
+    emit_fixture(
+        "replay_plan_asset_manifest_ref",
+        "ucf.v1.ReplayPlan",
+        &replay_plan_asset_manifest,
+        domain,
+    )?;
     emit_fixture(
         "consistency_feedback_low_flags",
         "ucf.v1.ConsistencyFeedback",
