@@ -1102,9 +1102,43 @@ fn replay_plan_high_fidelity_case() -> Result<()> {
             label: "vrf".to_string(),
         }),
         proof_receipt_ref: None,
+        asset_manifest_ref: None,
     };
 
     verify_case("replay_plan_high_fidelity", REPLAY_PLAN_SCHEMA, expected)
+}
+
+fn replay_plan_asset_manifest_ref_case() -> Result<()> {
+    let mut target_refs = vec![Ref {
+        uri: "ucf://macro/asset-refresh".to_string(),
+        label: "macro-asset-refresh".to_string(),
+    }];
+    target_refs.sort_by(|a, b| a.uri.cmp(&b.uri));
+
+    let mut trigger_reason_codes = vec!["asset-refresh".to_string()];
+    trigger_reason_codes.sort();
+
+    let expected = ReplayPlan {
+        replay_id: "replay-asset-manifest".to_string(),
+        replay_digest: Some(Digest32 { value: vec![0x45; 32] }),
+        trigger_reason_codes: Some(ReasonCodes { codes: trigger_reason_codes }),
+        target_refs,
+        fidelity: ReplayFidelity::ReplayMed as i32,
+        inject_mode: ReplayInjectMode::InjectReportOnly as i32,
+        stop_conditions: Some(replay_plan::StopConditions {
+            max_steps_class: 2,
+            max_budget_class: 1,
+            stop_on_dlp_flag: false,
+        }),
+        vrf_digest_ref: None,
+        proof_receipt_ref: None,
+        asset_manifest_ref: Some(Ref {
+            uri: "asset_manifest".to_string(),
+            label: "manifest-digest".to_string(),
+        }),
+    };
+
+    verify_case("replay_plan_asset_manifest_ref", REPLAY_PLAN_SCHEMA, expected)
 }
 
 fn consistency_feedback_low_flags_case() -> Result<()> {
@@ -1628,6 +1662,12 @@ const FIXTURE_CASES: &[FixtureCase] = &[
         schema: REASON_CODES_SCHEMA,
         proto_files: &["proto/ucf/v1/common.proto"],
         verify: reason_codes_basic_case,
+    },
+    FixtureCase {
+        name: "replay_plan_asset_manifest_ref",
+        schema: REPLAY_PLAN_SCHEMA,
+        proto_files: &["proto/ucf/v1/milestones.proto", "proto/ucf/v1/common.proto"],
+        verify: replay_plan_asset_manifest_ref_case,
     },
     FixtureCase {
         name: "replay_plan_high_fidelity",

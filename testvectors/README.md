@@ -32,6 +32,7 @@ The fixtures currently included are:
 | meso_milestone_stable | `ucf-core` | `ucf.v1.MesoMilestone` | `1`     |
 | macro_milestone_finalized | `ucf-core` | `ucf.v1.MacroMilestone` | `1`     |
 | replay_plan_high_fidelity | `ucf-core` | `ucf.v1.ReplayPlan` | `1`     |
+| replay_plan_asset_manifest_ref | `ucf-core` | `ucf.v1.ReplayPlan` | `1`     |
 | consistency_feedback_low_flags | `ucf-core` | `ucf.v1.ConsistencyFeedback` | `1`     |
 | tool_registry_container | `ucf-core` | `ucf.v1.ToolRegistryContainer` | `1`     |
 | tool_onboarding_event | `ucf-core` | `ucf.v1.ToolOnboardingEvent` | `1`     |
