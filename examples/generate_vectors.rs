@@ -624,6 +624,63 @@ fn main() -> anyhow::Result<()> {
         }),
     };
 
+    let replay_run = ReplayRunEvidence {
+        run_id: "run-889".to_string(),
+        run_digest: Some(Digest32 { value: vec![0xAA; 32] }),
+        replay_plan_ref: Some(Ref {
+            uri: "ucf://replay/plan-889".to_string(),
+            label: "replay-plan".to_string(),
+        }),
+        asset_manifest_ref: Some(Ref {
+            uri: "ucf://assets/manifest-21".to_string(),
+            label: "asset-manifest".to_string(),
+        }),
+        micro_configs: vec![
+            MicrocircuitConfigEvidence {
+                module: MicroModule::Lc as i32,
+                config_version: 2,
+                config_digest: Some(Digest32 { value: vec![0x11; 32] }),
+                created_at_ms: 1_700_101_100,
+                prev_config_digest: None,
+                proof_receipt_ref: Some(Ref {
+                    uri: "proof://micro/lc/receipt".to_string(),
+                    label: "lc-proof".to_string(),
+                }),
+                attestation_sig: Some(Signature {
+                    algorithm: "ed25519".to_string(),
+                    signer: vec![0x10, 0x20, 0x30],
+                    signature: vec![0x40, 0x50, 0x60],
+                }),
+                attestation_key_id: Some("key-lc-1".to_string()),
+            },
+            MicrocircuitConfigEvidence {
+                module: MicroModule::Sn as i32,
+                config_version: 3,
+                config_digest: Some(Digest32 { value: vec![0x22; 32] }),
+                created_at_ms: 1_700_101_200,
+                prev_config_digest: Some(Digest32 { value: vec![0x33; 32] }),
+                proof_receipt_ref: None,
+                attestation_sig: None,
+                attestation_key_id: None,
+            },
+        ],
+        steps: 42,
+        dt_us: 25,
+        substeps_per_tick: 4,
+        summary_profile_seq_digest: Some(Digest32 { value: vec![0x55; 32] }),
+        summary_dwm_seq_digest: Some(Digest32 { value: vec![0x66; 32] }),
+        created_at_ms: 1_700_200_321,
+        proof_receipt_ref: Some(Ref {
+            uri: "proof://replay/run/receipt".to_string(),
+            label: "replay-proof".to_string(),
+        }),
+        attestation_sig: Some(Signature {
+            algorithm: "ed25519".to_string(),
+            signer: vec![0x01, 0x02, 0x03],
+            signature: vec![0x04, 0x05, 0x06],
+        }),
+    };
+
     let consistency_feedback = ConsistencyFeedback {
         cf_id: "cf-low-001".to_string(),
         cf_digest: Some(Digest32 { value: vec![0x55; 32] }),
@@ -1014,6 +1071,7 @@ fn main() -> anyhow::Result<()> {
         &replay_plan_asset_manifest,
         domain,
     )?;
+    emit_fixture("replay_run_evidence", "ucf.v1.ReplayRunEvidence", &replay_run, domain)?;
     emit_fixture(
         "consistency_feedback_low_flags",
         "ucf.v1.ConsistencyFeedback",

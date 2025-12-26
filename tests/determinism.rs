@@ -20,6 +20,7 @@ const MICRO_MILESTONE_SCHEMA: &str = "ucf.v1.MicroMilestone";
 const MESO_MILESTONE_SCHEMA: &str = "ucf.v1.MesoMilestone";
 const MACRO_MILESTONE_SCHEMA: &str = "ucf.v1.MacroMilestone";
 const REPLAY_PLAN_SCHEMA: &str = "ucf.v1.ReplayPlan";
+const REPLAY_RUN_SCHEMA: &str = "ucf.v1.ReplayRunEvidence";
 const CONSISTENCY_FEEDBACK_SCHEMA: &str = "ucf.v1.ConsistencyFeedback";
 const TOOL_REGISTRY_SCHEMA: &str = "ucf.v1.ToolRegistryContainer";
 const TOOL_ONBOARDING_SCHEMA: &str = "ucf.v1.ToolOnboardingEvent";
@@ -68,6 +69,7 @@ const PROTO_FILES: &[&str] = &[
     "proto/ucf/v1/geist.proto",
     "proto/ucf/v1/sep.proto",
     "proto/ucf/v1/microcircuit.proto",
+    "proto/ucf/v1/replay_run.proto",
 ];
 
 fn sorted_strings(items: &[&str]) -> Vec<String> {
@@ -1141,6 +1143,69 @@ fn replay_plan_asset_manifest_ref_case() -> Result<()> {
     verify_case("replay_plan_asset_manifest_ref", REPLAY_PLAN_SCHEMA, expected)
 }
 
+fn replay_run_evidence_case() -> Result<()> {
+    let micro_configs = vec![
+        MicrocircuitConfigEvidence {
+            module: MicroModule::Lc as i32,
+            config_version: 2,
+            config_digest: Some(Digest32 { value: vec![0x11; 32] }),
+            created_at_ms: 1_700_101_100,
+            prev_config_digest: None,
+            proof_receipt_ref: Some(Ref {
+                uri: "proof://micro/lc/receipt".to_string(),
+                label: "lc-proof".to_string(),
+            }),
+            attestation_sig: Some(Signature {
+                algorithm: "ed25519".to_string(),
+                signer: vec![0x10, 0x20, 0x30],
+                signature: vec![0x40, 0x50, 0x60],
+            }),
+            attestation_key_id: Some("key-lc-1".to_string()),
+        },
+        MicrocircuitConfigEvidence {
+            module: MicroModule::Sn as i32,
+            config_version: 3,
+            config_digest: Some(Digest32 { value: vec![0x22; 32] }),
+            created_at_ms: 1_700_101_200,
+            prev_config_digest: Some(Digest32 { value: vec![0x33; 32] }),
+            proof_receipt_ref: None,
+            attestation_sig: None,
+            attestation_key_id: None,
+        },
+    ];
+
+    let expected = ReplayRunEvidence {
+        run_id: "run-889".to_string(),
+        run_digest: Some(Digest32 { value: vec![0xAA; 32] }),
+        replay_plan_ref: Some(Ref {
+            uri: "ucf://replay/plan-889".to_string(),
+            label: "replay-plan".to_string(),
+        }),
+        asset_manifest_ref: Some(Ref {
+            uri: "ucf://assets/manifest-21".to_string(),
+            label: "asset-manifest".to_string(),
+        }),
+        micro_configs,
+        steps: 42,
+        dt_us: 25,
+        substeps_per_tick: 4,
+        summary_profile_seq_digest: Some(Digest32 { value: vec![0x55; 32] }),
+        summary_dwm_seq_digest: Some(Digest32 { value: vec![0x66; 32] }),
+        created_at_ms: 1_700_200_321,
+        proof_receipt_ref: Some(Ref {
+            uri: "proof://replay/run/receipt".to_string(),
+            label: "replay-proof".to_string(),
+        }),
+        attestation_sig: Some(Signature {
+            algorithm: "ed25519".to_string(),
+            signer: vec![0x01, 0x02, 0x03],
+            signature: vec![0x04, 0x05, 0x06],
+        }),
+    };
+
+    verify_case("replay_run_evidence", REPLAY_RUN_SCHEMA, expected)
+}
+
 fn consistency_feedback_low_flags_case() -> Result<()> {
     let mut ism_refs = vec![
         Ref { uri: "ucf://macro/root".to_string(), label: "macro-anchor".to_string() },
@@ -1674,6 +1739,12 @@ const FIXTURE_CASES: &[FixtureCase] = &[
         schema: REPLAY_PLAN_SCHEMA,
         proto_files: &["proto/ucf/v1/milestones.proto", "proto/ucf/v1/common.proto"],
         verify: replay_plan_high_fidelity_case,
+    },
+    FixtureCase {
+        name: "replay_run_evidence",
+        schema: REPLAY_RUN_SCHEMA,
+        proto_files: &["proto/ucf/v1/replay_run.proto", "proto/ucf/v1/common.proto"],
+        verify: replay_run_evidence_case,
     },
     FixtureCase {
         name: "sep_event_chain_1",

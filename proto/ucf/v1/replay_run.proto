@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package ucf.v1;
+
+import "ucf/v1/common.proto";
+import "ucf/v1/assets.proto";
+import "ucf/v1/microcircuit.proto";
+import "ucf/v1/pvgs.proto";
+
+message ReplayRunEvidence {
+  string run_id = 1;
+  Digest32 run_digest = 2;
+  Ref replay_plan_ref = 3;
+  Ref asset_manifest_ref = 4;
+  repeated MicrocircuitConfigEvidence micro_configs = 5; // bounded
+  uint32 steps = 6;
+  uint32 dt_us = 7;
+  uint32 substeps_per_tick = 8;
+  Digest32 summary_profile_seq_digest = 9;
+  Digest32 summary_dwm_seq_digest = 10;
+  uint64 created_at_ms = 11;
+  optional Ref proof_receipt_ref = 12;
+  optional Signature attestation_sig = 13;
+}
