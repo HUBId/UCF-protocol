@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+package ucf.v1;
+
+import "ucf/v1/common.proto";
+
+// Digest32.value must contain exactly 32 bytes.
+
+enum ProposalActivationStatus {
+  PROPOSAL_ACTIVATION_STATUS_UNSPECIFIED = 0;
+  PROPOSAL_ACTIVATION_STATUS_PENDING = 1;
+  PROPOSAL_ACTIVATION_STATUS_ACTIVE = 2;
+  PROPOSAL_ACTIVATION_STATUS_REJECTED = 3;
+  PROPOSAL_ACTIVATION_STATUS_ROLLED_BACK = 4;
+  PROPOSAL_ACTIVATION_STATUS_SUPERSEDED = 5;
+}
+
+message ProposalActivationEvidence {
+  string activation_id = 1;
+  Digest32 activation_digest = 2;
+  Digest32 proposal_digest = 3;
+  Digest32 approval_digest = 4;
+  ProposalActivationStatus status = 5;
+  optional Digest32 active_mapping_digest = 6;
+  optional Digest32 active_sae_pack_digest = 7;
+  optional Digest32 active_liquid_params_digest = 8;
+  optional Digest32 active_limits_digest = 9;
+  uint64 created_at_ms = 10;
+  repeated string reason_codes = 11; // bounded in docs
+}

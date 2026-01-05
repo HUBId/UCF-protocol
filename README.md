@@ -8,6 +8,12 @@ Milestone 1 for the UCF protocol includes:
 * Golden determinism fixtures stored in `testvectors/` (hex-encoded protobuf
   bytes) with tests to verify round-tripping.
 
+## Versioning notes
+
+Schema evolution is documented in `docs/protocol_versioning.md`. The v1 schema
+now includes proposal, activation, and trace evidence messages in addition to
+the original milestone and runtime evidence definitions.
+
 ## Building
 
 This crate uses `prost-build` in `build.rs` to compile the protobuf schemas at

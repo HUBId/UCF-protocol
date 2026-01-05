@@ -19,6 +19,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "proto/ucf/v1/sep.proto",
         "proto/ucf/v1/microcircuit.proto",
         "proto/ucf/v1/replay_run.proto",
+        "proto/ucf/v1/proposal.proto",
+        "proto/ucf/v1/activation.proto",
+        "proto/ucf/v1/trace.proto",
     ];
 
     println!("cargo:rerun-if-changed=proto");
