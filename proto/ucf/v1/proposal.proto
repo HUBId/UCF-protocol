@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+package ucf.v1;
+
+import "ucf/v1/common.proto";
+
+// Digest32.value must contain exactly 32 bytes.
+
+enum ProposalKind {
+  PROPOSAL_KIND_UNSPECIFIED = 0;
+  PROPOSAL_KIND_POLICY = 1;
+  PROPOSAL_KIND_MAPPING = 2;
+  PROPOSAL_KIND_SAE_PACK = 3;
+  PROPOSAL_KIND_LIQUID_PARAMS = 4;
+  PROPOSAL_KIND_LIMITS = 5;
+  PROPOSAL_KIND_OTHER = 6;
+}
+
+enum ProposalVerdict {
+  PROPOSAL_VERDICT_UNSPECIFIED = 0;
+  PROPOSAL_VERDICT_APPROVED = 1;
+  PROPOSAL_VERDICT_REJECTED = 2;
+  PROPOSAL_VERDICT_NEEDS_REVIEW = 3;
+}
+
+message ProposalEvidence {
+  string proposal_id = 1; // bounded in docs
+  Digest32 proposal_digest = 2;
+  ProposalKind kind = 3;
+  Digest32 base_evidence_digest = 4;
+  Digest32 payload_digest = 5;
+  uint64 created_at_ms = 6;
+  int32 score = 7;
+  ProposalVerdict verdict = 8;
+  repeated string reason_codes = 9; // bounded in docs
+}
+
+message ProposalPayloadRef {
+  ProposalKind kind = 1;
+  string uri_or_path = 2;
+  Digest32 payload_digest = 3;
+}

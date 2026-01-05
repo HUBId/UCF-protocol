@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package ucf.v1;
+
+import "ucf/v1/common.proto";
+
+// Digest32.value must contain exactly 32 bytes.
+
+enum TraceVerdict {
+  TRACE_VERDICT_UNSPECIFIED = 0;
+  TRACE_VERDICT_PROMISING = 1;
+  TRACE_VERDICT_NEUTRAL = 2;
+  TRACE_VERDICT_RISKY = 3;
+}
+
+message TraceRunEvidence {
+  string trace_id = 1;
+  Digest32 trace_digest = 2;
+  Digest32 active_cfg_digest = 3;
+  Digest32 shadow_cfg_digest = 4;
+  Digest32 active_feedback_digest = 5;
+  Digest32 shadow_feedback_digest = 6;
+  int32 score_active = 7;
+  int32 score_shadow = 8;
+  int32 delta = 9;
+  TraceVerdict verdict = 10;
+  uint64 created_at_ms = 11;
+  repeated string reason_codes = 12; // bounded in docs
+}
